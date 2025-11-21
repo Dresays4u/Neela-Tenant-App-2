@@ -1,0 +1,157 @@
+
+export enum TenantStatus {
+  APPLICANT = 'Applicant',
+  APPROVED = 'Approved',
+  ACTIVE = 'Active',
+  PAST = 'Past',
+  EVICTION_PENDING = 'Eviction Pending'
+}
+
+export interface ApplicationData {
+  submissionDate: string;
+  employment: {
+    employer: string;
+    jobTitle: string;
+    monthlyIncome: number;
+    duration: string;
+  };
+  references: {
+    name: string;
+    relation: string;
+    phone: string;
+  }[];
+  documents: {
+    name: string;
+    url: string;
+    type: 'ID' | 'Income' | 'Other';
+  }[];
+  internalNotes: string;
+  backgroundCheckId?: string;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  status: TenantStatus;
+  propertyUnit: string;
+  leaseStart: string;
+  leaseEnd: string;
+  rentAmount: number;
+  deposit: number;
+  balance: number;
+  creditScore?: number; // Simulated TransUnion score
+  backgroundCheckStatus?: 'Pending' | 'Clear' | 'Flagged';
+  applicationData?: ApplicationData;
+  leaseStatus?: 'Draft' | 'Sent' | 'Signed';
+  signedLeaseUrl?: string;
+}
+
+export interface Payment {
+  id: string;
+  tenantId: string;
+  amount: number;
+  date: string;
+  status: 'Paid' | 'Pending' | 'Overdue' | 'Failed';
+  type: 'Rent' | 'Late Fee' | 'Deposit' | 'Application Fee';
+  method: 'Stripe (ACH)' | 'Credit Card' | 'Cash' | 'Zelle' | 'Venmo' | 'CashApp' | 'Apple Pay' | 'Check';
+  reference?: string;
+}
+
+export interface Invoice {
+  id: string;
+  tenantId: string;
+  date: string;
+  dueDate: string;
+  amount: number;
+  period: string;
+  status: 'Paid' | 'Pending' | 'Overdue';
+  items?: { description: string; amount: number }[];
+}
+
+export interface PortalNotification {
+  id: string;
+  type: 'Rent' | 'Maintenance' | 'System' | 'Message';
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+  actionUrl?: string;
+}
+
+export enum MaintenanceStatus {
+  OPEN = 'Open',
+  IN_PROGRESS = 'In Progress',
+  RESOLVED = 'Resolved',
+  CLOSED = 'Closed'
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  tenantId: string;
+  category: 'Plumbing' | 'Electrical' | 'HVAC' | 'Appliance' | 'General';
+  description: string;
+  status: MaintenanceStatus;
+  priority: 'Low' | 'Medium' | 'High' | 'Emergency';
+  createdAt: string;
+  images?: string[];
+  updates?: { date: string; message: string; author: string }[];
+  assignedTo?: string;
+  completionAttachments?: { name: string; url: string }[];
+}
+
+export enum LegalNoticeType {
+  NOTICE_TO_VACATE_3_DAY = '3-Day Notice to Vacate',
+  LEASE_TERMINATION_30_DAY = '30-Day Lease Termination',
+  EVICTION_FILING = 'Eviction Filing Packet',
+  LATE_RENT_NOTICE = 'Notice of Late Rent',
+  LEASE_VIOLATION = 'Lease Violation Notice'
+}
+
+export interface LegalDocument {
+  id: string;
+  tenantId: string;
+  type: LegalNoticeType;
+  generatedContent: string;
+  createdAt: string;
+  status: 'Draft' | 'Sent' | 'Delivered' | 'Filed';
+  deliveryMethod?: 'Email' | 'Certified Mail' | 'Hand Delivered' | 'Portal';
+  trackingNumber?: string;
+}
+
+export interface NoticeTemplate {
+  id: string;
+  name: string;
+  type: LegalNoticeType;
+  content: string;
+  lastUpdated: string;
+}
+
+export interface Listing {
+  id: string;
+  title: string;
+  address: string;
+  price: number;
+  beds: number;
+  baths: number;
+  sqft: number;
+  image: string;
+  description: string;
+  amenities: string[];
+}
+
+export interface ApplicationForm {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dob: string;
+  currentAddress: string;
+  employer: string;
+  jobTitle: string;
+  income: string;
+  ssnLast4: string;
+  references: { name: string; relation: string; phone: string }[];
+  consentBackgroundCheck: boolean;
+}
