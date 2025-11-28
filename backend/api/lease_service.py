@@ -1,0 +1,211 @@
+"""
+Lease generation and PDF creation service.
+"""
+from io import BytesIO
+from datetime import datetime, timedelta
+from django.conf import settings
+from django.core.files.base import ContentFile
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from .models import Tenant, LeaseTemplate, LegalDocument
+
+
+def fill_lease_template(template_content: str, tenant: Tenant) -> str:
+    """
+    Fill lease template with tenant data.
+    
+    Args:
+        template_content: Template string with placeholders
+        tenant: Tenant instance
+        
+    Returns:
+        Filled template string
+    """
+    # Extract name parts
+    name_parts = tenant.name.split(' ', 1)
+    first_name = name_parts[0] if len(name_parts) > 0 else tenant.name
+    last_name = name_parts[1] if len(name_parts) > 1 else ''
+    
+    # Calculate lease dates (default to 1 year from today)
+    lease_start = tenant.lease_start or datetime.now().date()
+    if not tenant.lease_end:
+        lease_end = lease_start + timedelta(days=365)
+    else:
+        lease_end = tenant.lease_end
+    
+    # Get employment info from application data
+    employment = tenant.application_data.get('employment', {}) if tenant.application_data else {}
+    
+    # Template variables
+    replacements = {
+        '{{tenant_name}}': tenant.name,
+        '{{tenant_first_name}}': first_name,
+        '{{tenant_last_name}}': last_name,
+        '{{tenant_email}}': tenant.email,
+        '{{tenant_phone}}': tenant.phone,
+        '{{property_unit}}': tenant.property_unit,
+        '{{rent_amount}}': f"${tenant.rent_amount:,.2f}",
+        '{{deposit_amount}}': f"${tenant.deposit:,.2f}",
+        '{{lease_start_date}}': lease_start.strftime('%B %d, %Y'),
+        '{{lease_end_date}}': lease_end.strftime('%B %d, %Y'),
+        '{{employer}}': employment.get('employer', 'N/A'),
+        '{{job_title}}': employment.get('jobTitle', 'N/A'),
+        '{{monthly_income}}': f"${employment.get('monthlyIncome', 0):,.2f}" if employment.get('monthlyIncome') else 'N/A',
+        '{{current_date}}': datetime.now().strftime('%B %d, %Y'),
+        '{{property_manager}}': getattr(settings, 'PROPERTY_MANAGER_NAME', 'Property Management'),
+    }
+    
+    # Replace all placeholders
+    filled_content = template_content
+    for placeholder, value in replacements.items():
+        filled_content = filled_content.replace(placeholder, str(value))
+    
+    return filled_content
+
+
+def generate_lease_pdf(tenant: Tenant, template: LeaseTemplate = None):
+    """
+    Generate PDF lease document from template.
+    
+    Args:
+        tenant: Tenant instance
+        template: LeaseTemplate instance (optional, uses default if not provided)
+        
+    Returns:
+        tuple: (PDF BytesIO object, filled content string)
+    """
+    # Get template
+    if not template:
+        template = LeaseTemplate.objects.filter(is_active=True).first()
+        if not template:
+            # Create default template if none exists
+            template = LeaseTemplate.objects.create(
+                name='Standard Residential Lease',
+                content=get_default_lease_template(),
+                is_active=True
+            )
+    
+    # Fill template with tenant data
+    filled_content = fill_lease_template(template.content, tenant)
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+                           rightMargin=72, leftMargin=72,
+                           topMargin=72, bottomMargin=18)
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    
+    # Define styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#1e293b'),
+        spaceAfter=30,
+        alignment=1,  # Center
+    )
+    
+    # Add title
+    elements.append(Paragraph("RESIDENTIAL LEASE AGREEMENT", title_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Split content into paragraphs and add to PDF
+    paragraphs = filled_content.split('\n\n')
+    for para in paragraphs:
+        if para.strip():
+            # Clean up the paragraph
+            para = para.strip().replace('\n', '<br/>')
+            elements.append(Paragraph(para, styles['Normal']))
+            elements.append(Spacer(1, 0.1*inch))
+    
+    # Build PDF
+    doc.build(elements)
+    
+    # Reset buffer position
+    buffer.seek(0)
+    
+    return buffer, filled_content
+
+
+def get_default_lease_template() -> str:
+    """Return default lease template content."""
+    return """RESIDENTIAL LEASE AGREEMENT
+
+This Lease Agreement ("Lease") is entered into on {{current_date}} between {{property_manager}} ("Landlord") and {{tenant_name}} ("Tenant").
+
+1. PROPERTY
+Landlord leases to Tenant the property located at {{property_unit}} (the "Property").
+
+2. TERM
+The lease term begins on {{lease_start_date}} and ends on {{lease_end_date}}.
+
+3. RENT
+Tenant agrees to pay Landlord monthly rent of {{rent_amount}} per month, due on the first day of each month.
+
+4. SECURITY DEPOSIT
+Tenant has paid a security deposit of {{deposit_amount}} which will be held by Landlord as security for the performance of Tenant's obligations under this Lease.
+
+5. TENANT INFORMATION
+Tenant Name: {{tenant_name}}
+Email: {{tenant_email}}
+Phone: {{tenant_phone}}
+Employer: {{employer}}
+Job Title: {{job_title}}
+Monthly Income: {{monthly_income}}
+
+6. OBLIGATIONS
+Tenant agrees to:
+- Pay rent on time
+- Keep the Property clean and in good condition
+- Not disturb other tenants
+- Comply with all applicable laws and regulations
+
+7. DEFAULT
+If Tenant fails to pay rent or breaches any term of this Lease, Landlord may terminate this Lease.
+
+8. SIGNATURES
+By signing below, both parties agree to the terms of this Lease.
+
+_________________________          _________________________
+Landlord                            Tenant
+{{current_date}}                    {{current_date}}"""
+
+
+def save_lease_document(tenant: Tenant, pdf_buffer: BytesIO, filled_content: str) -> LegalDocument:
+    """
+    Save lease document to database and storage.
+    
+    Args:
+        tenant: Tenant instance
+        pdf_buffer: PDF file buffer
+        filled_content: Filled template content
+        
+    Returns:
+        LegalDocument instance
+    """
+    # Create or update legal document
+    legal_doc, created = LegalDocument.objects.get_or_create(
+        tenant=tenant,
+        type='Lease Agreement',
+        defaults={
+            'generated_content': filled_content,
+            'status': 'Draft',
+        }
+    )
+    
+    if not created:
+        legal_doc.generated_content = filled_content
+        legal_doc.status = 'Draft'
+    
+    # Save PDF file
+    filename = f"lease_{tenant.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    legal_doc.pdf_file.save(filename, ContentFile(pdf_buffer.read()), save=True)
+    
+    return legal_doc
+

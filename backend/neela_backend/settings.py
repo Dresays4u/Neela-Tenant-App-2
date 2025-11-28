@@ -12,10 +12,15 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 
 from pathlib import Path
+from datetime import timedelta
 
 import os
-import dj_database_url
+import dj_database_url  # type: ignore
+from dotenv import load_dotenv
+import sys
+import logging
 
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -48,6 +53,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'api',
+    'accounts',
+    'django_celery_results',
+    'rest_framework_simplejwt',
 ]
 
 MIDDLEWARE = [
@@ -118,6 +126,33 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES':[
+        'rest_framework.permissions.AllowAny'
+    ]
+}
+
+# JWT Token Configuration
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # Access token valid for 1 hour
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # Refresh token valid for 7 days
+    'ROTATE_REFRESH_TOKENS': True,  # Issue new refresh token on each refresh
+    'BLACKLIST_AFTER_ROTATION': True,  # Blacklist old refresh tokens
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+}
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
@@ -138,7 +173,122 @@ STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# Media files (User uploaded content)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Custom User Model
+AUTH_USER_MODEL = 'accounts.User'
+
+# Email Configuration
+# Allow EMAIL_BACKEND to be overridden via environment variable
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend'
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+
+# DocuSign Configuration (optional)
+DOCUSIGN_API_CLIENT_ID = os.environ.get('DOCUSIGN_API_CLIENT_ID', '').strip()
+# DOCUSIGN_API_SECRET = os.environ.get('DOCUSIGN_API_SECRET', '').strip()
+DOCUSIGN_ACCOUNT_ID = os.environ.get('DOCUSIGN_ACCOUNT_ID', '').strip()
+DOCUSIGN_BASE_PATH = os.environ.get('DOCUSIGN_BASE_PATH', 'https://demo.docusign.net/restapi').strip()
+DOCUSIGN_USER_ID = os.environ.get('DOCUSIGN_USER_ID', '').strip()
+DOCUSIGN_PRIVATE_KEY_FILE = os.path.join(BASE_DIR, 'neela_backend', 'dsign_private.key')
+
+DOCUSIGN_REDIRECT_URI = os.environ.get(
+    "DOCUSIGN_REDIRECT_URI",
+    os.environ.get("DOCUSIGN_REDIRECT_URL", "http://localhost:8000/docusign/callback/")
+)
+
+
+with open(DOCUSIGN_PRIVATE_KEY_FILE, "rb") as f:
+    DOCUSIGN_PRIVATE_KEY = f.read()
+
+# Log DocuSign configuration status at startup
+logger = logging.getLogger(__name__)
+docusign_configured = bool(DOCUSIGN_API_CLIENT_ID and DOCUSIGN_ACCOUNT_ID)
+if docusign_configured:
+    logger.info(
+        f"DocuSign configured: API Client ID present (length: {len(DOCUSIGN_API_CLIENT_ID)}), "
+        f"Account ID present (length: {len(DOCUSIGN_ACCOUNT_ID)})"
+    )
+else:
+    missing = []
+    if not DOCUSIGN_API_CLIENT_ID:
+        missing.append('DOCUSIGN_API_CLIENT_ID')
+    if not DOCUSIGN_ACCOUNT_ID:
+        missing.append('DOCUSIGN_ACCOUNT_ID')
+    logger.warning(
+        f"DocuSign not configured. Missing environment variables: {', '.join(missing)}. "
+        f"DocuSign features will be unavailable."
+    )
+
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# Windows compatibility: Use 'solo' pool instead of 'prefork' on Windows
+# Prefork doesn't work well on Windows due to process forking limitations
+if sys.platform == 'win32':
+    CELERY_WORKER_POOL = 'solo'  # Use solo pool on Windows
+else:
+    CELERY_WORKER_POOL = 'prefork'  # Use prefork on Linux/Mac
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose' if DEBUG else 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'api': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'api.email_service': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}

@@ -2,11 +2,24 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Tenant, LegalNoticeType } from '../types';
 
-// Initialize Gemini
 // Note: In a real production app, we would proxy this through a backend to protect the API Key.
-// For this demo, we assume process.env.API_KEY is available.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// For this demo, we use import.meta.env.VITE_GEMINI_API_KEY from environment variables.
+
 const modelId = 'gemini-2.5-flash';
+
+// Lazy initialization function to get GoogleGenAI instance
+function getAIInstance(): GoogleGenAI {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error(
+      'Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your .env.local file. ' +
+      'See README.md for setup instructions.'
+    );
+  }
+  
+  return new GoogleGenAI({ apiKey });
+}
 
 export const generateLegalNotice = async (tenant: Tenant, noticeType: LegalNoticeType): Promise<string> => {
   const prompt = `
@@ -32,6 +45,7 @@ export const generateLegalNotice = async (tenant: Tenant, noticeType: LegalNotic
   `;
 
   try {
+    const ai = getAIInstance();
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
       contents: prompt,
@@ -39,6 +53,9 @@ export const generateLegalNotice = async (tenant: Tenant, noticeType: LegalNotic
     return response.text || "Error generating legal document.";
   } catch (error) {
     console.error("Gemini API Error:", error);
+    if (error instanceof Error && error.message.includes('API key')) {
+      return error.message;
+    }
     return "Failed to generate document. Please check your API key configuration.";
   }
 };
@@ -57,6 +74,7 @@ export const analyzeMaintenanceRequest = async (description: string): Promise<{ 
   `;
 
   try {
+    const ai = getAIInstance();
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
       contents: prompt,
@@ -69,6 +87,10 @@ export const analyzeMaintenanceRequest = async (description: string): Promise<{ 
     return JSON.parse(text);
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
+    if (error instanceof Error && error.message.includes('API key')) {
+      // Return fallback but log the error
+      console.warn("API key error in maintenance analysis:", error.message);
+    }
     return { priority: 'Medium', vendorType: 'General', summary: 'Could not analyze automatically.' };
   }
 };
@@ -96,6 +118,7 @@ export const generateLeaseAgreement = async (tenant: Tenant, templateType: strin
   `;
 
   try {
+    const ai = getAIInstance();
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: modelId,
       contents: prompt,
@@ -103,6 +126,9 @@ export const generateLeaseAgreement = async (tenant: Tenant, templateType: strin
     return response.text || "Error generating lease.";
   } catch (error) {
     console.error("Gemini Lease Gen Error:", error);
+    if (error instanceof Error && error.message.includes('API key')) {
+      return error.message;
+    }
     return "Failed to generate lease. Please try again.";
   }
 };

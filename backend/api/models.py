@@ -82,6 +82,16 @@ class MaintenanceRequest(models.Model):
     def __str__(self):
         return f"{self.category} - {self.tenant.name}"
 
+class LeaseTemplate(models.Model):
+    name = models.CharField(max_length=255)
+    content = models.TextField(help_text="Lease template content with placeholders like {{tenant_name}}, {{rent_amount}}, etc.")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
 class LegalDocument(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='legal_documents')
     type = models.CharField(max_length=100)
@@ -90,6 +100,12 @@ class LegalDocument(models.Model):
     status = models.CharField(max_length=50)
     delivery_method = models.CharField(max_length=50, null=True, blank=True)
     tracking_number = models.CharField(max_length=100, null=True, blank=True)
+    # Lease-specific fields
+    pdf_file = models.FileField(upload_to='leases/', null=True, blank=True)
+    docusign_envelope_id = models.CharField(max_length=255, null=True, blank=True)
+    docusign_signing_url = models.URLField(null=True, blank=True)
+    signed_pdf_url = models.URLField(null=True, blank=True)
+    signed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.type} - {self.tenant.name}"
@@ -107,3 +123,25 @@ class Listing(models.Model):
 
     def __str__(self):
         return self.title
+
+class Property(models.Model):
+    name = models.CharField(max_length=255)
+    address = models.CharField(max_length=255)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=50)
+    units = models.IntegerField(default=1)
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    image = models.ImageField(upload_to='properties/', null=True, blank=True)
+    image_url = models.URLField(null=True, blank=True)  # For external URLs
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+    
+    @property
+    def display_image(self):
+        """Returns the uploaded image URL if available, otherwise the external URL"""
+        if self.image:
+            return self.image.url
+        return self.image_url

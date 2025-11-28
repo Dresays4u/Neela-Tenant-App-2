@@ -4,17 +4,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell 
 } from 'recharts';
-import { DollarSign, AlertCircle, CheckCircle2, Users, FileText } from 'lucide-react';
-import { Tenant, Payment, MaintenanceRequest, TenantStatus } from '../types';
+import { DollarSign, AlertCircle, CheckCircle2, Users, FileText, Building2, Home, Settings } from 'lucide-react';
+import { Tenant, Payment, MaintenanceRequest, TenantStatus, Property } from '../types';
 
 interface DashboardProps {
   tenants: Tenant[];
   payments: Payment[];
   maintenance: MaintenanceRequest[];
+  properties: Property[];
   onReviewApplications: () => void;
 }
 
-const DashboardView: React.FC<DashboardProps> = ({ tenants, payments, maintenance, onReviewApplications }) => {
+const DashboardView: React.FC<DashboardProps> = ({ tenants, payments, maintenance, properties, onReviewApplications }) => {
   // Derived Metrics
   const totalRevenue = payments
     .filter(p => p.status === 'Paid')
@@ -141,6 +142,83 @@ const DashboardView: React.FC<DashboardProps> = ({ tenants, payments, maintenanc
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Property Portfolio Section */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-indigo-600" />
+            Property Portfolio
+          </h3>
+          <a 
+            href="#settings" 
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.hash = 'settings';
+            }}
+            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+          >
+            Manage Properties
+            <Settings className="w-4 h-4" />
+          </a>
+        </div>
+        {properties.length === 0 ? (
+          <div className="text-center py-8 text-slate-500">
+            <Home className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+            <p>No properties yet. Add your first property in Settings.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {properties.slice(0, 6).map(prop => (
+              <div key={prop.id} className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
+                {prop.image ? (
+                  <div className="h-32 bg-slate-200 overflow-hidden">
+                    <img 
+                      src={prop.image} 
+                      alt={prop.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center"><Home class="w-8 h-8 text-slate-400" /></div>';
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="h-32 bg-slate-200 flex items-center justify-center">
+                    <Home className="w-8 h-8 text-slate-400" />
+                  </div>
+                )}
+                <div className="p-4">
+                  <h4 className="font-bold text-slate-800 mb-1">{prop.name}</h4>
+                  <p className="text-sm text-slate-600 mb-2">{prop.address}, {prop.city}, {prop.state}</p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded font-medium">
+                      {prop.units} {prop.units === 1 ? 'Unit' : 'Units'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {properties.length > 6 && (
+          <div className="mt-4 text-center">
+            <p className="text-sm text-slate-500">
+              Showing 6 of {properties.length} properties. 
+              <a 
+                href="#settings" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.hash = 'settings';
+                }}
+                className="text-indigo-600 hover:text-indigo-700 font-medium ml-1"
+              >
+                View all
+              </a>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Action Required Section */}

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MaintenanceRequest, MaintenanceStatus, Tenant } from '../types';
 import { analyzeMaintenanceRequest } from '../services/geminiService';
+import { api } from '../services/api';
 import { 
   Wrench, MessageSquare, Loader2, Filter, Download, Search, 
   User, Calendar, CheckCircle, X, Paperclip, Send, AlertTriangle,
@@ -10,11 +11,14 @@ import {
 interface MaintenanceProps {
   requests: MaintenanceRequest[];
   tenants: Tenant[];
+  onMaintenanceChange?: () => void;
 }
 
-const MaintenanceView: React.FC<MaintenanceProps> = ({ requests: initialRequests, tenants }) => {
+const MaintenanceView: React.FC<MaintenanceProps> = ({ requests: initialRequests, tenants, onMaintenanceChange }) => {
   // State
   const [requests, setRequests] = useState<MaintenanceRequest[]>(initialRequests);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<MaintenanceRequest | null>(null);
   const [newRequestDesc, setNewRequestDesc] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -29,6 +33,11 @@ const MaintenanceView: React.FC<MaintenanceProps> = ({ requests: initialRequests
   const [assigneeName, setAssigneeName] = useState('');
 
   const tenantsMap = tenants.reduce((acc, t) => ({ ...acc, [t.id]: t }), {} as Record<string, Tenant>);
+
+  // Sync requests when props change
+  useEffect(() => {
+    setRequests(initialRequests);
+  }, [initialRequests]);
 
   // Filtering Logic
   const filteredRequests = requests.filter(req => {
@@ -45,72 +54,129 @@ const MaintenanceView: React.FC<MaintenanceProps> = ({ requests: initialRequests
 
   // Actions
   const handleAnalyze = async () => {
-    if (!newRequestDesc) return;
+    if (!newRequestDesc || tenants.length === 0) return;
     setIsAnalyzing(true);
+    setErrorMessage(null);
     try {
       const result = await analyzeMaintenanceRequest(newRequestDesc);
-      const newTicket: MaintenanceRequest = {
-        id: `m-${Date.now()}`,
+      const newTicketData: Partial<MaintenanceRequest> = {
         tenantId: tenants[0].id, // Defaulting to first tenant for quick add demo
         category: 'General',
         description: newRequestDesc,
         status: MaintenanceStatus.OPEN,
         priority: result.priority as any || 'Medium',
-        createdAt: new Date().toISOString().split('T')[0],
         updates: [{
           date: new Date().toISOString().split('T')[0],
           message: `AI Analysis: Recommended ${result.vendorType} - ${result.summary}`,
           author: 'System'
         }]
       };
-      setRequests([newTicket, ...requests]);
+      const createdTicket = await api.createMaintenanceRequest(newTicketData);
+      setRequests([createdTicket, ...requests]);
       setNewRequestDesc('');
+      if (onMaintenanceChange) {
+        onMaintenanceChange();
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to create maintenance request');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const updateTicketStatus = (id: string, newStatus: MaintenanceStatus) => {
-    setRequests(requests.map(r => r.id === id ? { ...r, status: newStatus } : r));
-    if (selectedTicket) setSelectedTicket({ ...selectedTicket, status: newStatus });
+  const updateTicketStatus = async (id: string, newStatus: MaintenanceStatus) => {
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      const updated = await api.updateMaintenanceRequest(id, { status: newStatus });
+      setRequests(requests.map(r => r.id === id ? updated : r));
+      if (selectedTicket && selectedTicket.id === id) {
+        setSelectedTicket(updated);
+      }
+      if (onMaintenanceChange) {
+        onMaintenanceChange();
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update status');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const assignTicket = (id: string) => {
+  const assignTicket = async (id: string) => {
     if (!assigneeName) return;
-    setRequests(requests.map(r => r.id === id ? { ...r, assignedTo: assigneeName } : r));
-    if (selectedTicket) setSelectedTicket({ ...selectedTicket, assignedTo: assigneeName });
-    addUpdate(id, `Ticket assigned to ${assigneeName}`);
-    setAssigneeName('');
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      const updated = await api.updateMaintenanceRequest(id, { assignedTo: assigneeName });
+      setRequests(requests.map(r => r.id === id ? updated : r));
+      if (selectedTicket && selectedTicket.id === id) {
+        setSelectedTicket(updated);
+      }
+      await addUpdate(id, `Ticket assigned to ${assigneeName}`);
+      setAssigneeName('');
+      if (onMaintenanceChange) {
+        onMaintenanceChange();
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to assign ticket');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const addUpdate = (id: string, message: string) => {
+  const addUpdate = async (id: string, message: string) => {
+    const ticket = requests.find(r => r.id === id);
+    if (!ticket) return;
+    
     const newUpdate = {
       date: new Date().toISOString().split('T')[0],
       message,
       author: 'Manager'
     };
-    setRequests(requests.map(r => {
-      if (r.id === id) {
-        return { ...r, updates: [...(r.updates || []), newUpdate] };
+    const updatedUpdates = [...(ticket.updates || []), newUpdate];
+    
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      const updated = await api.updateMaintenanceRequest(id, { updates: updatedUpdates });
+      setRequests(requests.map(r => r.id === id ? updated : r));
+      if (selectedTicket && selectedTicket.id === id) {
+        setSelectedTicket(updated);
       }
-      return r;
-    }));
-    if (selectedTicket) {
-      setSelectedTicket({ ...selectedTicket, updates: [...(selectedTicket.updates || []), newUpdate] });
+      if (onMaintenanceChange) {
+        onMaintenanceChange();
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to add update');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleAttachFile = () => {
-    // Simulate file attachment
-    if (selectedTicket) {
-      const attachment = { name: 'Invoice_Repair.pdf', url: '#' };
-      const updated = { 
-        ...selectedTicket, 
-        completionAttachments: [...(selectedTicket.completionAttachments || []), attachment] 
-      };
+  const handleAttachFile = async () => {
+    if (!selectedTicket) return;
+    
+    // For now, simulate file attachment (in production, this would upload the file first)
+    const attachment = { name: 'Invoice_Repair.pdf', url: '#' };
+    const updatedAttachments = [...(selectedTicket.completionAttachments || []), attachment];
+    
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      const updated = await api.updateMaintenanceRequest(selectedTicket.id, { 
+        completionAttachments: updatedAttachments 
+      });
       setRequests(requests.map(r => r.id === selectedTicket.id ? updated : r));
       setSelectedTicket(updated);
-      addUpdate(selectedTicket.id, "Attached completion document: Invoice_Repair.pdf");
+      await addUpdate(selectedTicket.id, "Attached completion document: Invoice_Repair.pdf");
+      if (onMaintenanceChange) {
+        onMaintenanceChange();
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to attach file');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -148,6 +214,16 @@ const MaintenanceView: React.FC<MaintenanceProps> = ({ requests: initialRequests
 
   return (
     <div className="space-y-6 h-full flex flex-col">
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-rose-800 text-sm flex items-center justify-between">
+          <span>{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="text-rose-600 hover:text-rose-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header & Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>

@@ -112,12 +112,26 @@ export enum LegalNoticeType {
 export interface LegalDocument {
   id: string;
   tenantId: string;
-  type: LegalNoticeType;
+  type: LegalNoticeType | 'Lease Agreement';
   generatedContent: string;
   createdAt: string;
-  status: 'Draft' | 'Sent' | 'Delivered' | 'Filed';
-  deliveryMethod?: 'Email' | 'Certified Mail' | 'Hand Delivered' | 'Portal';
+  status: 'Draft' | 'Sent' | 'Delivered' | 'Filed' | 'Signed';
+  deliveryMethod?: 'Email' | 'Certified Mail' | 'Hand Delivered' | 'Portal' | 'DocuSign';
   trackingNumber?: string;
+  pdfUrl?: string;
+  docusignEnvelopeId?: string;
+  docusignSigningUrl?: string;
+  signedPdfUrl?: string;
+  signedAt?: string;
+}
+
+export interface LeaseTemplate {
+  id: string;
+  name: string;
+  content: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface NoticeTemplate {
@@ -139,6 +153,19 @@ export interface Listing {
   image: string;
   description: string;
   amenities: string[];
+}
+
+export interface Property {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  units: number;
+  price?: number;
+  image?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ApplicationForm {
