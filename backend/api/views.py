@@ -175,7 +175,7 @@ class MaintenanceRequestViewSet(viewsets.ModelViewSet):
         """Override to send email notifications when maintenance request is created."""
         maintenance_request = serializer.save()
         
-        # Send email notification to manager
+        # Send email notification to 
         try:
             task = send_maintenance_ticket_notification_to_manager.delay(maintenance_request.id)
             logger.info(f"Maintenance ticket notification task submitted to Celery: {task.id}")
