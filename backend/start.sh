@@ -4,6 +4,10 @@
 echo "Running database migrations..."
 python manage.py migrate
 
+# Collect static files
+echo "Collecting static files..."
+python manage.py collectstatic --noinput
+
 # Create superuser if env vars are set
 echo "Checking for superuser creation..."
 python manage.py create_superuser_from_env
