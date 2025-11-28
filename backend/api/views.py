@@ -379,9 +379,19 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
             request_obj = request._request if hasattr(request, '_request') else request
             pdf_url = request_obj.build_absolute_uri(legal_doc.pdf_file.url) if legal_doc.pdf_file else None
             
-            if not pdf_url:
+            # Get PDF content directly to avoid download issues
+            pdf_content = None
+            try:
+                if legal_doc.pdf_file:
+                    legal_doc.pdf_file.open('rb')
+                    pdf_content = legal_doc.pdf_file.read()
+                    legal_doc.pdf_file.close()
+            except Exception as e:
+                logger.warning(f"Could not read PDF file directly: {e}")
+            
+            if not pdf_url and not pdf_content:
                 return Response(
-                    {'error': 'Could not generate PDF URL.'},
+                    {'error': 'Could not generate PDF URL or read content.'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
@@ -392,7 +402,8 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                     legal_document_id=legal_doc.id,
                     tenant_email=legal_doc.tenant.email,
                     tenant_name=legal_doc.tenant.name,
-                    pdf_url=pdf_url
+                    pdf_url=pdf_url,
+                    pdf_content=pdf_content
                 )
                 
                 if not result:

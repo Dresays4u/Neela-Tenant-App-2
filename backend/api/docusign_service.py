@@ -375,7 +375,7 @@ def get_docusign_api_client() -> Optional[ApiClient]:
         return None
 
 
-def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str, pdf_url: str) -> Optional[Dict[str, Any]]:
+def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str, pdf_url: str = None, pdf_content: bytes = None) -> Optional[Dict[str, Any]]:
     """
     Create a DocuSign envelope for a lease document.
     """
@@ -393,15 +393,23 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
             logger.error("Failed to authenticate with DocuSign")
             return None
         
-        # Download PDF from URL
-        logger.info(f"Downloading PDF from {pdf_url}")
-        pdf_response = requests.get(pdf_url, timeout=30)
-        if pdf_response.status_code != 200:
-            logger.error(f"Failed to download PDF: {pdf_response.status_code}")
-            return None
+        pdf_base64 = None
         
-        pdf_bytes = pdf_response.content
-        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        if pdf_content:
+            logger.info("Using provided PDF content directly")
+            pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+        elif pdf_url:
+            # Download PDF from URL
+            logger.info(f"Downloading PDF from {pdf_url}")
+            pdf_response = requests.get(pdf_url, timeout=30)
+            if pdf_response.status_code != 200:
+                logger.error(f"Failed to download PDF: {pdf_response.status_code}")
+                return None
+            pdf_bytes = pdf_response.content
+            pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        else:
+            logger.error("No PDF content or URL provided")
+            return None
         
         # Log document encoding status
         logger.debug(f"Document base64 length: {len(pdf_base64)}")
