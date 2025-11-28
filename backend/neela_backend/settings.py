@@ -56,7 +56,6 @@ INSTALLED_APPS = [
     'accounts',
     'django_celery_results',
     'rest_framework_simplejwt',
-    # 'anymail', # Added for SendGrid support
 ]
 
 MIDDLEWARE = [
