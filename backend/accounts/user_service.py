@@ -67,17 +67,7 @@ def generate_password_reset_token(user):
 
 
 def get_password_reset_url(uidb64, token, base_url=None):
-    """
-    Generate the full password reset URL.
-    
-    Args:
-        uidb64: Base64 encoded user ID
-        token: Password reset token
-        base_url: Base URL of the frontend (optional, defaults to settings)
-        
-    Returns:
-        str: Full password reset URL
-    """
+
     if base_url is None:
         # Try to get from settings or use a default
         base_url = getattr(settings, 'FRONTEND_URL', 'https://neela-tenant.vercel.app')
@@ -86,7 +76,7 @@ def get_password_reset_url(uidb64, token, base_url=None):
     base_url = base_url.rstrip('/')
     
     # Construct the reset URL
-    reset_url = f"{base_url}/reset-password/{uidb64}/{token}/"
+    reset_url = f"{base_url}/reset-password/{uidb64}/{token}"
     
     return reset_url
 

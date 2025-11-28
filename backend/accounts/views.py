@@ -61,16 +61,7 @@ def verify_reset_token(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def reset_password(request):
-    """
-    Reset user password using token.
-    
-    POST /accounts/reset-password/
-    Body: {
-        "uidb64": "...",
-        "token": "...",
-        "new_password": "..."
-    }
-    """
+
     uidb64 = request.data.get('uidb64')
     token = request.data.get('token')
     new_password = request.data.get('new_password')
@@ -152,21 +143,6 @@ def reset_password(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
-    """
-    Login endpoint that returns JWT tokens and user/tenant data.
-    
-    POST /accounts/login/
-    Body: {
-        "email": "...",
-        "password": "..."
-    }
-    Returns: {
-        "access": "...",
-        "refresh": "...",
-        "user": {...},
-        "tenant": {...} or null
-    }
-    """
     email = request.data.get('email')
     password = request.data.get('password')
     
