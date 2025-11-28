@@ -198,7 +198,7 @@ AUTH_USER_MODEL = 'accounts.User'
 # Allow EMAIL_BACKEND to be overridden via environment variable
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend'
+    'django.core.mail.backends.smtp.EmailBackend'
 )
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '465'))
