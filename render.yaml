@@ -28,6 +28,10 @@ services:
         sync: false
       - key: DOCUSIGN_ACCOUNT_ID
         sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false # Optional: Set to auto-create admin
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false # Optional: Set to auto-create admin
     # We don't specify dockerCommand here because we'll use the CMD from Dockerfile
     # which will point to our start.sh script
 
