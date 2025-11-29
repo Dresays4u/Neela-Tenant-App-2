@@ -604,25 +604,45 @@ def get_envelope_status(envelope_id: str) -> Optional[Dict[str, Any]]:
         return None
     
     try:
-        config = get_docusign_config()
+        # Ensure auth and get fresh token
         api_client = get_docusign_api_client()
         
         if not api_client:
             return None
         
-        envelopes_api = EnvelopesApi(api_client)
-        resolved_account_id = _docusign_token_cache.get('account_id') or config['account_id']
+        # Use raw request for reliability
+        base_path = _docusign_token_cache.get('base_path') or get_docusign_config()['base_path']
+        resolved_account_id = _docusign_token_cache.get('account_id') or get_docusign_config()['account_id']
+        access_token = _docusign_token_cache.get('access_token')
         
-        logger.debug(f"Getting status for envelope {envelope_id}")
-        envelope = envelopes_api.get_envelope(
-            account_id=resolved_account_id,
-            envelope_id=envelope_id
-        )
+        if not access_token:
+            logger.error("No access token available for status check")
+            return None
+            
+        # Ensure base_path has version
+        if '/v2.1' not in base_path:
+             base_path = base_path + '/v2.1'
+             
+        url = f"{base_path}/accounts/{resolved_account_id}/envelopes/{envelope_id}"
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        logger.debug(f"Getting status for envelope {envelope_id} via RAW request")
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code != 200:
+            logger.error(f"Error getting envelope status: {response.status_code} - {response.text}")
+            return None
+            
+        envelope = response.json()
         
         return {
-            'status': envelope.status,
-            'completed_date_time': envelope.completed_date_time.isoformat() if envelope.completed_date_time else None,
-            'sent_date_time': envelope.sent_date_time.isoformat() if envelope.sent_date_time else None,
+            'status': envelope.get('status'),
+            'completed_date_time': envelope.get('completedDateTime'),
+            'sent_date_time': envelope.get('sentDateTime'),
         }
         
     except Exception as e:
@@ -641,26 +661,38 @@ def download_signed_document(envelope_id: str) -> Optional[bytes]:
         return None
     
     try:
-        config = get_docusign_config()
+        # Ensure auth
         api_client = get_docusign_api_client()
         
         if not api_client:
             return None
         
-        envelopes_api = EnvelopesApi(api_client)
-        resolved_account_id = _docusign_token_cache.get('account_id') or config['account_id']
+        # Use raw request for reliability
+        base_path = _docusign_token_cache.get('base_path') or get_docusign_config()['base_path']
+        resolved_account_id = _docusign_token_cache.get('account_id') or get_docusign_config()['account_id']
+        access_token = _docusign_token_cache.get('access_token')
         
-        logger.info(f"Downloading signed document for envelope {envelope_id}")
+        if not access_token:
+            return None
+
+        if '/v2.1' not in base_path:
+             base_path = base_path + '/v2.1'
+             
+        # 'combined' gets all documents merged
+        url = f"{base_path}/accounts/{resolved_account_id}/envelopes/{envelope_id}/documents/combined"
         
-        # Get the combined PDF (all documents in the envelope)
-        pdf_bytes = envelopes_api.get_document(
-            account_id=resolved_account_id,
-            envelope_id=envelope_id,
-            document_id='combined'  # 'combined' gets all documents merged
-        )
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
         
-        logger.info(f"Successfully downloaded signed document for envelope {envelope_id}")
-        return pdf_bytes
+        logger.info(f"Downloading signed document for envelope {envelope_id} via RAW request")
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code != 200:
+            logger.error(f"Error downloading DocuSign signed document: {response.status_code} - {response.text}")
+            return None
+            
+        return response.content
         
     except Exception as e:
         logger.error(f"Error downloading DocuSign signed document: {e}", exc_info=True)
