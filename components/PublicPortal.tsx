@@ -177,8 +177,11 @@ const PublicPortal: React.FC<PublicPortalProps> = ({ onAdminLogin, tenantId, onM
           const tenantData = await api.getMyTenant();
           setCurrentTenant(tenantData);
           // Determine user status based on tenant status
-          if (tenantData.status === TenantStatus.APPROVED || tenantData.status === TenantStatus.ACTIVE) {
+          if (tenantData.status === TenantStatus.ACTIVE) {
             setUserStatus('resident');
+            setView('dashboard');
+          } else if (tenantData.status === TenantStatus.APPROVED) {
+            setUserStatus('applicant_approved');
             setView('dashboard');
           } else if (tenantData.status === TenantStatus.APPLICANT) {
             setUserStatus('applicant_pending');
@@ -875,7 +878,7 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
     </div>
   );
 
-  const StatusTracker: React.FC<{ status: UserStatus }> = ({ status }) => {
+  const StatusTracker: React.FC<{ status: UserStatus; leaseStatus?: string }> = ({ status, leaseStatus }) => {
     const steps = [
       { id: 'applicant_pending', label: 'Application Submitted', icon: FileText },
       { id: 'reviewing', label: 'Under Review', icon: User },
@@ -885,7 +888,12 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
 
     const getStepState = (stepId: string) => {
       if (status === 'resident') return 'completed';
-      if (status === 'applicant_approved') return stepId === 'resident' ? 'pending' : 'completed';
+      if (status === 'applicant_approved') {
+        if (stepId === 'resident') {
+           return leaseStatus === 'Signed' ? 'completed' : 'pending';
+        }
+        return 'completed';
+      }
       if (status === 'applicant_pending') return stepId === 'applicant_pending' || stepId === 'reviewing' ? 'current' : 'pending';
       return 'pending';
     };
@@ -1315,7 +1323,7 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
               <div className="space-y-8">
                 <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-800 mb-6">Timeline</h3>
-                  <StatusTracker status={userStatus} />
+                  <StatusTracker status={userStatus} leaseStatus={leaseDocument?.status || currentTenant?.leaseStatus} />
                 </div>
                 {userStatus === 'applicant_approved' && (
                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-8 flex flex-col items-center justify-center text-center">

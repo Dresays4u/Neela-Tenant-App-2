@@ -1122,6 +1122,7 @@ Landlord                            Tenant
                       </label>
                       <input
                         type="text"
+                        autoComplete="off"
                         value={formData.name || ''}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
@@ -1134,6 +1135,7 @@ Landlord                            Tenant
                       </label>
                       <input
                         type="email"
+                        autoComplete="off"
                         value={formData.email || ''}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
@@ -1146,6 +1148,7 @@ Landlord                            Tenant
                       </label>
                       <input
                         type="tel"
+                        autoComplete="off"
                         value={formData.phone || ''}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
