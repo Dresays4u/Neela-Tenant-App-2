@@ -144,7 +144,27 @@ ________________________ Tenant`);
     });
     setImageFile(null);
     setImagePreview(null);
-    setImageInputMethod(property.image ? 'url' : 'upload');
+    
+    // Logic: 
+    // 1. If property.image is a URL starting with http/https but NOT pointing to our own media backend, it's likely an external URL -> set mode to 'url'.
+    // 2. If property.image is a local path (e.g. /media/...) or a full URL to our backend, treat it as 'upload' (so we show the file input or existing image).
+    // However, since the backend serializer converts file uploads to full URLs (e.g. http://backend.com/media/...), differentiating is tricky.
+    // SIMPLIFIED LOGIC: If we have an image string:
+    // - If it looks like a backend media URL (contains '/media/'), default to 'upload' view to show it as an existing file? 
+    //   Actually, 'upload' mode typically expects a NEW file. 
+    //   Let's stick to: If it's a file upload from us, we might want to show it in a way that indicates "Existing Image".
+    //   The user's issue is that they upload a file, save, and when they re-open, it shows as a URL.
+    //   That is technically correct behavior because the backend returns the URL of the uploaded file.
+    //   To fix the UX, if the URL looks like it comes from our backend storage, we can default to 'upload' mode but show "Current Image" preview.
+    
+    const isBackendMedia = property.image?.includes('/media/');
+    setImageInputMethod(isBackendMedia ? 'upload' : (property.image ? 'url' : 'upload'));
+    
+    // If it is a backend media, we want to show it as a preview in the upload section, not as a text URL
+    if (isBackendMedia && property.image) {
+        setImagePreview(property.image);
+    }
+
     setIsEditModalOpen(true);
   };
 
