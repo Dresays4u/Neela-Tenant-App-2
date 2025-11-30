@@ -538,6 +538,29 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                     except:
                         send_lease_signed_confirmation(legal_doc.id)
 
+                    # CRITICAL: Check if user account exists, if not, create it and send setup email
+                    # This handles manual tenant adds who bypassed the "Applicant -> Approved" flow
+                    try:
+                        user, created = create_user_from_tenant(tenant)
+                        if created or not user.has_usable_password():
+                            # Generate password reset token for account setup
+                            token, uidb64 = generate_password_reset_token(user)
+                            
+                            # Get frontend URL from settings
+                            frontend_url = getattr(settings, 'FRONTEND_URL', 'https://neela-tenant.vercel.app')
+                            reset_url = get_password_reset_url(uidb64, token, frontend_url)
+                            
+                            # Send acceptance/welcome email with password setup link
+                            try:
+                                task = send_acceptance_email_to_user.delay(tenant.id, token, reset_url)
+                                logger.info(f"Account setup email task submitted for tenant {tenant.id}")
+                            except Exception as e:
+                                logger.warning(f"Celery connection failed, using threading fallback for account setup: {e}")
+                                send_acceptance_email_to_user(tenant.id, token, reset_url)
+                    except Exception as e:
+                         logger.error(f"Error ensuring user account exists after lease signing: {e}", exc_info=True)
+
+
             elif ds_status in ['declined', 'voided']:
                 legal_doc.status = 'Declined' if ds_status == 'declined' else 'Voided'
                 legal_doc.save()
