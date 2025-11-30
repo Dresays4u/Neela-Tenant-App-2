@@ -57,3 +57,4 @@ class SendGridBackend(BaseEmailBackend):
 
         return count
 
+
