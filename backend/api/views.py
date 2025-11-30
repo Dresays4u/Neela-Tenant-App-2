@@ -421,14 +421,20 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                 )
                             
                             # Generate a signed URL for the resource
-                            resource_path = legal_doc.pdf_file.name
-                            logger.info(f"Generating signed URL for resource: {resource_path}")
+                            # For 'raw' resources, Cloudinary stores them with the name we gave them.
+                            # The public_id in save_lease_document was f"leases/{filename}".
+                            # legal_doc.pdf_file.name should contain this public_id.
                             
-                            # Cloudinary storage usually saves with resource type image/upload
-                            # We try 'image' first, then 'raw'
+                            resource_path = legal_doc.pdf_file.name
+                            # Ensure resource_path doesn't have leading slashes or 'media/' prefix if it was already included in public_id
+                            # Cloudinary public_ids are stored as is.
+                            
+                            logger.info(f"Generating signed URL for raw resource: {resource_path}")
+                            
+                            # Since we uploaded as 'raw', we MUST use resource_type='raw' first
                             signed_url, options = cloudinary.utils.cloudinary_url(
                                 resource_path, 
-                                resource_type="image", 
+                                resource_type="raw", 
                                 sign_url=True
                             )
                             
@@ -438,31 +444,19 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                             if response.status_code == 200:
                                 pdf_content = response.content
                             else:
-                                logger.warning(f"Failed to download from signed URL (image): {response.status_code}. Trying 'raw'...")
-                                # Try 'raw' resource type as fallback
-                                signed_url_raw, _ = cloudinary.utils.cloudinary_url(
+                                logger.warning(f"Failed to download from signed URL (raw): {response.status_code}. Trying 'image'...")
+                                # Fallback to 'image' resource type just in case
+                                signed_url_img, _ = cloudinary.utils.cloudinary_url(
                                     resource_path, 
-                                    resource_type="raw", 
+                                    resource_type="image", 
                                     sign_url=True
                                 )
-                                response_raw = requests.get(signed_url_raw)
-                                if response_raw.status_code == 200:
-                                    pdf_content = response_raw.content
+                                response_img = requests.get(signed_url_img)
+                                if response_img.status_code == 200:
+                                    pdf_content = response_img.content
                                 else:
-                                    # Last ditch: try accessing with .pdf extension if missing
-                                    if not resource_path.lower().endswith('.pdf'):
-                                        signed_url_pdf, _ = cloudinary.utils.cloudinary_url(
-                                            resource_path + '.pdf', 
-                                            resource_type="image", 
-                                            sign_url=True
-                                        )
-                                        response_pdf = requests.get(signed_url_pdf)
-                                        if response_pdf.status_code == 200:
-                                            pdf_content = response_pdf.content
-                                        else:
-                                            raise Exception(f"Could not retrieve file from Cloudinary. Status: {response_raw.status_code}")
-                                    else:
-                                        raise Exception(f"Could not retrieve file from Cloudinary. Status: {response_raw.status_code}")
+                                    raise Exception(f"Could not retrieve file from Cloudinary. Status: {response.status_code}")
+
                         else:
                             raise read_error
 
