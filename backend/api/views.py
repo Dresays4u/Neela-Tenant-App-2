@@ -66,6 +66,16 @@ class TenantViewSet(viewsets.ModelViewSet):
             # Create user account if it doesn't exist
             user, created = create_user_from_tenant(tenant)
             
+            # Auto-generate lease document
+            try:
+                # Check if lease already exists to prevent duplicates
+                if not LegalDocument.objects.filter(tenant=tenant, type='Lease Agreement').exists():
+                    pdf_buffer, filled_content = generate_lease_pdf(tenant)
+                    save_lease_document(tenant, pdf_buffer, filled_content)
+                    logger.info(f"Lease automatically generated for tenant {tenant.id}")
+            except Exception as e:
+                logger.error(f"Failed to auto-generate lease for tenant {tenant.id}: {e}")
+
             # Generate password reset token
             token, uidb64 = generate_password_reset_token(user)
             

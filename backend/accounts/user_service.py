@@ -21,9 +21,17 @@ def create_user_from_tenant(tenant):
         tuple: (user, created) - User instance and boolean indicating if user was created
     """
     # Extract name parts from tenant name
-    name_parts = tenant.name.split(' ', 1)
-    first_name = name_parts[0] if len(name_parts) > 0 else tenant.name
+    name_parts = tenant.name.strip().split(' ', 1)
+    first_name = name_parts[0] if len(name_parts) > 0 else ''
     last_name = name_parts[1] if len(name_parts) > 1 else ''
+
+    # Handle case where first_name is empty but name exists (rare)
+    if not first_name and tenant.name:
+        first_name = tenant.name
+
+    # Fallback if name is empty or looks like email
+    if not first_name and '@' in tenant.email:
+        first_name = tenant.email.split('@')[0].capitalize()
 
     # Check if user already exists
     try:
@@ -31,10 +39,10 @@ def create_user_from_tenant(tenant):
         
         # Backfill name if missing
         updated = False
-        if not user.first_name:
+        if not user.first_name and first_name:
             user.first_name = first_name
             updated = True
-        if not user.last_name:
+        if not user.last_name and last_name:
             user.last_name = last_name
             updated = True
             
