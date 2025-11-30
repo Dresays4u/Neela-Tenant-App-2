@@ -455,7 +455,26 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                 if response_img.status_code == 200:
                                     pdf_content = response_img.content
                                 else:
-                                    raise Exception(f"Could not retrieve file from Cloudinary. Status: {response.status_code}")
+                                    # Last ditch: ensure resource_path matches what was uploaded (e.g. stripping prefixes)
+                                    # Sometimes 'leases/filename.pdf' needs to be just 'filename.pdf' depending on folder config
+                                    # But public_id usually includes folder.
+                                    
+                                    # Try without extension if it has one
+                                    if resource_path.lower().endswith('.pdf'):
+                                        no_ext_path = resource_path[:-4]
+                                        signed_url_no_ext, _ = cloudinary.utils.cloudinary_url(
+                                            no_ext_path, 
+                                            resource_type="raw", 
+                                            sign_url=True
+                                        )
+                                        logger.info(f"Attempting download without extension: {signed_url_no_ext}")
+                                        response_no_ext = requests.get(signed_url_no_ext)
+                                        if response_no_ext.status_code == 200:
+                                            pdf_content = response_no_ext.content
+                                        else:
+                                            raise Exception(f"Could not retrieve file from Cloudinary. Status: {response.status_code}")
+                                    else:
+                                        raise Exception(f"Could not retrieve file from Cloudinary. Status: {response.status_code}")
 
                         else:
                             raise read_error
