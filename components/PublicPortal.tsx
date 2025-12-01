@@ -210,6 +210,35 @@ const PublicPortal: React.FC<PublicPortalProps> = ({ onAdminLogin, tenantId, onM
     checkAuth();
   }, []);
 
+  // Add this manual refresh function
+  const refreshApplicationStatus = async () => {
+    setLoadingTenant(true);
+    try {
+      const tenantData = await api.getMyTenant();
+      setCurrentTenant(tenantData);
+      
+      // Update status
+      if (tenantData.status === TenantStatus.ACTIVE) {
+        setUserStatus('resident');
+      } else if (tenantData.status === TenantStatus.APPROVED) {
+        setUserStatus('applicant_approved');
+      } else if (tenantData.status === TenantStatus.APPLICANT) {
+        setUserStatus('applicant_pending');
+      }
+      
+      // Fetch lease doc if we are approved
+      if (tenantData.status === TenantStatus.APPROVED || tenantData.status === TenantStatus.ACTIVE) {
+         // Trigger fetching lease by updating dependencies or calling fetch directly?
+         // The existing useEffect [currentTenant?.id, tenantId, view] will likely fire when currentTenant changes.
+      }
+      
+    } catch (error) {
+      console.error('Error refreshing tenant status:', error);
+    } finally {
+      setLoadingTenant(false);
+    }
+  };
+
   // Fetch tenant's maintenance requests
   useEffect(() => {
     const tenantIdToUse = currentTenant?.id || tenantId;
@@ -888,13 +917,25 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
 
     const getStepState = (stepId: string) => {
       if (status === 'resident') return 'completed';
+      
       if (status === 'applicant_approved') {
+        // If we are approved, 'Approved' step should be active/completed
+        if (stepId === 'applicant_pending' || stepId === 'reviewing') return 'completed';
+        if (stepId === 'applicant_approved') return 'completed'; // Or 'current' depending on design, but 'completed' usually implies "done"
+        
         if (stepId === 'resident') {
            return leaseStatus === 'Signed' ? 'completed' : 'pending';
         }
         return 'completed';
       }
-      if (status === 'applicant_pending') return stepId === 'applicant_pending' || stepId === 'reviewing' ? 'current' : 'pending';
+      
+      // If pending, submitted is done, reviewing is current
+      if (status === 'applicant_pending') {
+        if (stepId === 'applicant_pending') return 'completed';
+        if (stepId === 'reviewing') return 'current';
+        return 'pending';
+      }
+      
       return 'pending';
     };
 
@@ -1303,12 +1344,24 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
                     : 'Track your application progress below.'}
                 </p>
               </div>
-              {userStatus === 'resident' && (
-                  <div className="relative">
-                      <Bell className="w-6 h-6 text-slate-400 hover:text-slate-600 cursor-pointer" />
-                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-slate-50"></span>
-                  </div>
-              )}
+              <div className="flex items-center gap-3">
+                {userStatus !== 'resident' && (
+                  <button 
+                    onClick={refreshApplicationStatus}
+                    disabled={loadingTenant}
+                    className="flex items-center px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${loadingTenant ? 'animate-spin' : ''}`} />
+                    Refresh Status
+                  </button>
+                )}
+                {userStatus === 'resident' && (
+                    <div className="relative">
+                        <Bell className="w-6 h-6 text-slate-400 hover:text-slate-600 cursor-pointer" />
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-slate-50"></span>
+                    </div>
+                )}
+              </div>
             </div>
             
             {/* Loading State */}

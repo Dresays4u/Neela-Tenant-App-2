@@ -113,11 +113,13 @@ const TenantsView: React.FC<TenantsProps> = ({ tenants, initialTab = 'residents'
         status: TenantStatus.APPROVED
       });
       
-      // Close modal after a short delay
-      setTimeout(() => {
-        setSelectedApplicant(null);
-        setSuccessMessage(null);
-      }, 2000);
+      // Transition to Lease Generation tab instead of closing
+      setSuccessMessage('Application approved! You can now review and send the lease.');
+      setApplicantModalTab('lease');
+      
+      // Fetch the generated lease immediately
+      fetchLeaseDocument(selectedApplicant.id);
+
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to approve application');
     } finally {

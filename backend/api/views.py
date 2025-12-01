@@ -85,22 +85,23 @@ class TenantViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 logger.error(f"Failed to auto-generate lease for tenant {tenant.id}: {e}")
 
-            # Generate password reset token
-            token, uidb64 = generate_password_reset_token(user)
-            
-            # Get frontend URL from settings
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'https://neela-tenant.vercel.app')
-            reset_url = get_password_reset_url(uidb64, token, frontend_url)
-            
-            # Send acceptance email with password reset link
-            try:
-                # Try async with Celery
-                task = send_acceptance_email_to_user.delay(tenant.id, token, reset_url)
-                logger.info(f"Email task submitted to Celery: {task.id}")
-            except Exception as e:
-                # Fallback to threading if Celery connection fails (non-blocking)
-                logger.warning(f"Celery connection failed, using threading fallback: {e}")
-                send_acceptance_email_to_user(tenant.id, token, reset_url)  # Will use threading internally
+            # Generate password reset token if the user was just created or has no password
+            if created or not user.has_usable_password():
+                token, uidb64 = generate_password_reset_token(user)
+                
+                # Get frontend URL from settings
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'https://neela-tenant.vercel.app')
+                reset_url = get_password_reset_url(uidb64, token, frontend_url)
+                
+                # Send acceptance email with password reset link
+                try:
+                    # Try async with Celery
+                    task = send_acceptance_email_to_user.delay(tenant.id, token, reset_url)
+                    logger.info(f"Email task submitted to Celery: {task.id}")
+                except Exception as e:
+                    # Fallback to threading if Celery connection fails (non-blocking)
+                    logger.warning(f"Celery connection failed, using threading fallback: {e}")
+                    send_acceptance_email_to_user(tenant.id, token, reset_url)  # Will use threading internally
         
         # If status changed to 'Declined' or similar rejection status, send declined email
         if old_status == 'Applicant' and new_status in ['Declined', 'Rejected', 'Denied']:

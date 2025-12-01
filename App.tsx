@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const resetPasswordMatch = pathname.match(/^\/reset-password\/([^/]+)\/([^/]+)\/?$/);
   
   const [activeTab, setActiveTab] = useState('public-portal');
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [tenantsInitialTab, setTenantsInitialTab] = useState<'residents' | 'applicants'>('residents');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -31,10 +32,36 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const checkAuthAndFetch = async () => {
+      setIsAuthChecking(true);
       try {
+        // First check if we have a valid session
+        const isAuth = isAuthenticated();
+        
+        // If authenticated, default to dashboard unless we were already on public portal (explicit logout)
+        // But since this is initial load/refresh, we want to restore the session
+        if (isAuth && activeTab === 'public-portal') {
+           // We need to know if the user is admin or tenant
+           // For now, we'll default to dashboard if it's an admin, or public portal if it's a tenant
+           // But App.tsx mainly handles Admin dashboard switching. 
+           // PublicPortal handles its own internal state for tenants.
+           
+           // Check if user is admin/staff by peeking at local storage or relying on the fact 
+           // that only admins usually see the full dashboard here.
+           // Ideally, we should check user role. 
+           // For now, let's assume if they are authenticated at this level, they might be an admin
+           // BUT tenants also use the same auth token.
+           
+           // Let's rely on PublicPortal to handle tenant view if activeTab remains 'public-portal'
+           // But if it's an admin, they expect to see the dashboard.
+           const user = JSON.parse(localStorage.getItem('user') || '{}');
+           if (user.is_staff || user.is_superuser) {
+             setActiveTab('dashboard');
+           }
+        }
+
         // Only fetch admin data if user is authenticated and on admin view
-        if (activeTab !== 'public-portal' && isAuthenticated()) {
+        if (activeTab !== 'public-portal' && isAuth) {
           const [tenantsData, paymentsData, maintenanceData, propertiesData] = await Promise.all([
             api.getTenants(),
             api.getPayments(),
@@ -47,14 +74,13 @@ const App: React.FC = () => {
           setProperties(propertiesData);
         } else if (activeTab === 'public-portal') {
           // For public portal, only fetch properties
-          // getProperties handles 401 errors internally and retries without auth
           const propertiesData = await api.getProperties();
           setProperties(propertiesData);
         }
       } catch (error: any) {
         // Don't log 401 errors for public portal - they're handled gracefully
         if (activeTab === 'public-portal' && error?.message?.includes('401')) {
-          // Silently handle - properties endpoint will retry without auth
+          // Silently handle
         } else {
           console.error("Error fetching data:", error);
         }
@@ -64,10 +90,11 @@ const App: React.FC = () => {
         }
       } finally {
         setLoading(false);
+        setIsAuthChecking(false);
       }
     };
 
-    fetchData();
+    checkAuthAndFetch();
   }, [activeTab]);
 
   const handleReviewApplications = () => {
@@ -191,6 +218,17 @@ const App: React.FC = () => {
   }
 
   const isPublic = activeTab === 'public-portal';
+
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading PropGuard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-slate-50">
