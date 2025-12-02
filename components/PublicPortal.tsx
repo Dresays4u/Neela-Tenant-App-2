@@ -265,8 +265,13 @@ const PublicPortal: React.FC<PublicPortalProps> = ({ onAdminLogin, tenantId, onM
             setUserStatus('resident');
             setView('dashboard');
           } else if (tenantData.status === TenantStatus.APPROVED) {
-            setUserStatus('applicant_approved');
-            setView('dashboard');
+             // Check if lease is signed
+             if (tenantData.leaseStatus === 'Signed') {
+               setUserStatus('resident');
+             } else {
+               setUserStatus('applicant_approved');
+             }
+             setView('dashboard');
           } else if (tenantData.status === TenantStatus.APPLICANT) {
             setUserStatus('applicant_pending');
             setView('dashboard');
@@ -305,7 +310,11 @@ const PublicPortal: React.FC<PublicPortalProps> = ({ onAdminLogin, tenantId, onM
       if (tenantData.status === TenantStatus.ACTIVE) {
         setUserStatus('resident');
       } else if (tenantData.status === TenantStatus.APPROVED) {
-        setUserStatus('applicant_approved');
+         if (tenantData.leaseStatus === 'Signed') {
+           setUserStatus('resident');
+         } else {
+           setUserStatus('applicant_approved');
+         }
       } else if (tenantData.status === TenantStatus.APPLICANT) {
         setUserStatus('applicant_pending');
       }
@@ -1770,12 +1779,13 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
                       <Check className="w-12 h-12 text-emerald-600 mb-4" />
                       <h3 className="text-2xl font-bold text-emerald-900 mb-2">Approved!</h3>
                       <p className="text-emerald-800 mb-6 max-w-lg">
-                        Your application has been approved. Please sign the lease to finalize your move-in.
+                        Your application has been approved. A lease agreement will be sent to your email address. Please check your inbox to review and sign. Once signed, refresh this page to access your dashboard.
                       </p>
                       {leaseDocument ? (
-                        <button onClick={() => setView('lease_signing')} className="px-8 py-3 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all">
-                          Review & Sign Lease
-                        </button>
+                         <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 text-sm text-emerald-800 flex items-center gap-3">
+                           <Mail className="w-5 h-5 flex-shrink-0" />
+                           <span>Check your email for the lease agreement</span>
+                         </div>
                       ) : (
                         <div className="flex flex-col items-center">
                           <button disabled className="px-8 py-3 bg-emerald-400 text-white font-bold rounded-lg cursor-not-allowed flex items-center gap-2">
