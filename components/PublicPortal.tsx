@@ -1509,7 +1509,7 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
           </div>
         )}
 
-        {/* 2. LISTINGS VIEW (GUEST) */}
+        {/* 2. LISTINGS VIEWS (GUEST) */}
         {view === 'listings' && (
           <div className="space-y-8 pb-12">
             {/* Hero Section */}

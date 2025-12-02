@@ -229,34 +229,30 @@ def save_lease_document(tenant: Tenant, pdf_buffer: BytesIO, filled_content: str
             # The Cloudinary storage backend typically prepends MEDIA_TAG or similar if configured.
             # Even if we upload manually, if we set the name to "media/leases/...", the backend will look there.
             
-            # CRITICAL: Cloudinary raw resources vs image resources
-            # We are uploading as 'raw', so we should not include the extension in the public_id if we want the URL to be clean
-            # BUT, for 'raw' resources, Cloudinary REQUIRES the extension in the public_id to serve it with the correct content-type
-            # So we SHOULD keep the extension.
+            # CRITICAL: Remove the .pdf extension from public_id because format="pdf" adds it?
+            # Or keep it and remove format="pdf"?
+            # Cloudinary raw resources with format often duplicate extensions.
             
-            # The issue might be the folder 'media/' prefix. Cloudinary structure doesn't enforce 'media/' unless we put it there.
-            # Let's try to be consistent: "leases/filename.pdf"
-            
-            public_id = f"leases/{filename}"
-            
+            public_id = f"media/leases/{filename}" 
+            if public_id.endswith('.pdf'):
+                public_id = public_id[:-4]
+
             logger.info(f"Uploading lease PDF to Cloudinary with public_id: {public_id}")
             
-            # Upload as raw file
+            # Try to upload WITHOUT format="pdf" to see if that helps avoid confusion
             upload_result = cloudinary.uploader.upload(
                 pdf_buffer, 
                 resource_type="raw", 
                 public_id=public_id,
-                unique_filename=False,
-                overwrite=True
+                # format="pdf"  # Removed format to avoid double extension or raw/image confusion
             )
             
             logger.info(f"Cloudinary upload successful. Result public_id: {upload_result.get('public_id')}")
-            logger.info(f"Cloudinary secure_url: {upload_result.get('secure_url')}")
             
-            # We should store the full path/name that django-cloudinary-storage expects
-            # Or better yet, if we use the URL directly in other places, we might want to store the public_id
-            # For consistency with Django FileField, we usually store the relative path.
-            legal_doc.pdf_file.name = public_id # This should be what is stored in DB
+            # Manually set the file name/path to what Cloudinary returned or the expected path
+            # django-cloudinary-storage typically expects just the name if configured correctly, 
+            # but storing the public_id ensures we can retrieve it.
+            legal_doc.pdf_file.name = upload_result.get('public_id')
             legal_doc.save()
             
         except Exception as e:
