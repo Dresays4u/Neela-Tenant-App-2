@@ -458,7 +458,7 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                 f"media/{resource_path}" if not resource_path.startswith('media/') else resource_path,
                             ]
                             
-                            # If it ends with .pdf, try without
+                            # If it ends with .pdf, try without - but for RAW files, extension is usually part of ID
                             if resource_path.lower().endswith('.pdf'):
                                 paths_to_try.append(resource_path[:-4])
                                 paths_to_try.append(resource_path.replace('media/', '')[:-4])
@@ -470,27 +470,33 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                 
                                 logger.info(f"Trying path variant: {path}")
                                 
-                                # Try RAW signed
-                                signed_url, _ = cloudinary.utils.cloudinary_url(path, resource_type="raw", sign_url=True)
-                                logger.info(f"Checking RAW URL: {signed_url}")
-                                resp = requests.get(signed_url)
-                                if resp.status_code == 200:
-                                    pdf_content = resp.content
-                                    logger.info(f"Success with RAW signed: {path}")
-                                    break
-                                else:
-                                    logger.warning(f"RAW URL failed: {resp.status_code}")
+                                # Try RAW signed (most likely for PDF documents)
+                                try:
+                                    signed_url, _ = cloudinary.utils.cloudinary_url(path, resource_type="raw", sign_url=True)
+                                    logger.info(f"Checking RAW URL: {signed_url}")
+                                    resp = requests.get(signed_url)
+                                    if resp.status_code == 200:
+                                        pdf_content = resp.content
+                                        logger.info(f"Success with RAW signed: {path}")
+                                        break
+                                    else:
+                                        logger.warning(f"RAW URL failed: {resp.status_code}")
+                                except Exception as e:
+                                    logger.warning(f"Error generating/fetching RAW URL for {path}: {e}")
                                     
-                                # Try IMAGE signed (fallback for older files)
-                                signed_url_img, _ = cloudinary.utils.cloudinary_url(path, resource_type="image", sign_url=True)
-                                logger.info(f"Checking IMAGE URL: {signed_url_img}")
-                                resp = requests.get(signed_url_img)
-                                if resp.status_code == 200:
-                                    pdf_content = resp.content
-                                    logger.info(f"Success with IMAGE signed: {path}")
-                                    break
-                                else:
-                                    logger.warning(f"IMAGE URL failed: {resp.status_code}")
+                                # Try IMAGE signed (fallback for older files or if uploaded as image/auto)
+                                try:
+                                    signed_url_img, _ = cloudinary.utils.cloudinary_url(path, resource_type="image", sign_url=True)
+                                    logger.info(f"Checking IMAGE URL: {signed_url_img}")
+                                    resp = requests.get(signed_url_img)
+                                    if resp.status_code == 200:
+                                        pdf_content = resp.content
+                                        logger.info(f"Success with IMAGE signed: {path}")
+                                        break
+                                    else:
+                                        logger.warning(f"IMAGE URL failed: {resp.status_code}")
+                                except Exception as e:
+                                    logger.warning(f"Error generating/fetching IMAGE URL for {path}: {e}")
 
                             if not pdf_content:
                                 logger.error("All retrieval attempts failed for Cloudinary file.")
