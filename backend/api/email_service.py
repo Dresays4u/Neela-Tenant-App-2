@@ -356,6 +356,82 @@ def send_acceptance_email_to_user(tenant_id, reset_token, reset_url):
     _send_acceptance_email_to_user(tenant_id, reset_token, reset_url)
 
 
+def _send_application_approval_notification_to_admin(tenant_id):
+    """
+    Internal function to send email notification to admin when application is approved.
+    """
+    from .models import Tenant
+    
+    try:
+        tenant = Tenant.objects.get(id=tenant_id)
+    except Tenant.DoesNotExist:
+        logger.error(f"Tenant with ID {tenant_id} not found for approval notification.")
+        return
+        
+    admin_emails = get_admin_emails()
+    if not admin_emails:
+        return
+        
+    subject = f'Application Approved: {tenant.name} - {tenant.property_unit}'
+    
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'https://neela-tenant.vercel.app')
+    admin_login_url = f"{frontend_url.rstrip('/')}/admin-login"
+    
+    plain_message = f"""
+    Application Approved
+    
+    The application for {tenant.name} has been approved.
+    
+    Tenant: {tenant.name}
+    Property Unit: {tenant.property_unit}
+    Email: {tenant.email}
+    Phone: {tenant.phone}
+    
+    Please proceed with lease generation if not already done.
+    
+    Log in to view: {admin_login_url}
+    """
+    
+    # Use a simple HTML template or just plain text if no template exists
+    # For now, we'll reuse application_notification structure or send as plain/simple HTML
+    # Let's create a simple HTML message inline or use render_to_string if we had a template.
+    # We'll stick to simple plain text for admin notifications to be safe, or reuse application_notification.
+    
+    # Reusing application_notification.html but with different title
+    context = {
+        'tenant': tenant,
+        'property_unit': tenant.property_unit,
+        'email': tenant.email,
+        'phone': tenant.phone,
+        'admin_login_url': admin_login_url,
+        'title': 'Application Approved'
+    }
+    
+    try:
+        html_message = render_to_string('emails/application_notification.html', context)
+    except:
+        html_message = None
+        
+    send_email_with_logging(
+        subject=subject,
+        message=plain_message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=admin_emails,
+        html_message=html_message,
+        email_type=f"application approval admin notification (tenant {tenant.id})"
+    )
+
+
+@shared_task
+def send_application_approval_notification_to_admin(tenant_id):
+    """
+    Celery task to send email notification to admin when application is approved.
+    """
+    email_backend = getattr(settings, 'EMAIL_BACKEND', 'unknown')
+    logger.info(f"Celery task executing: send_application_approval_notification_to_admin for tenant {tenant_id}, using email backend: {email_backend}")
+    _send_application_approval_notification_to_admin(tenant_id)
+
+
 # ==================== Maintenance Request Email Functions ====================
 
 def _send_maintenance_ticket_notification_to_manager(maintenance_request_id):

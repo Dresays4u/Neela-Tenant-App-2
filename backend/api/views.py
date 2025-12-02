@@ -72,6 +72,14 @@ class TenantViewSet(viewsets.ModelViewSet):
         
         # If status changed from 'Applicant' to 'Approved', send acceptance email
         if old_status == 'Applicant' and new_status == 'Approved':
+            # Send notification to Admin about the approval
+            try:
+                task = send_application_approval_notification_to_admin.delay(tenant.id)
+                logger.info(f"Admin approval notification task submitted to Celery: {task.id}")
+            except Exception as e:
+                logger.warning(f"Celery connection failed for admin approval notification: {e}")
+                send_application_approval_notification_to_admin(tenant.id)
+
             # Create user account if it doesn't exist
             user, created = create_user_from_tenant(tenant)
             
