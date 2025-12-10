@@ -25,6 +25,10 @@ class Tenant(models.Model):
     application_data = models.JSONField(null=True, blank=True)
     lease_status = models.CharField(max_length=50, null=True, blank=True)
     signed_lease_url = models.URLField(null=True, blank=True)
+    
+    # File storage fields for application documents
+    photo_id_files = models.JSONField(default=list, blank=True, help_text="List of uploaded photo ID file paths")
+    income_verification_files = models.JSONField(default=list, blank=True, help_text="List of uploaded income verification file paths")
 
     def __str__(self):
         return self.name

@@ -189,13 +189,61 @@ export const api = {
     };
   },
 
-  createTenant: async (tenantData: Partial<Tenant>): Promise<Tenant> => {
-    const backendData = api.mapTenantToBackend(tenantData);
+  createTenant: async (tenantData: any): Promise<Tenant> => {
+    // Check if we have files to upload
+    const hasFiles = (tenantData.photoIdFiles && tenantData.photoIdFiles.length > 0) ||
+                     (tenantData.incomeVerificationFiles && tenantData.incomeVerificationFiles.length > 0);
+    
+    let body: FormData | string;
+    let headers: HeadersInit;
+    
+    if (hasFiles) {
+      // Use FormData for file upload
+      const formData = new FormData();
+      
+      // Add basic tenant fields
+      formData.append('name', tenantData.name || '');
+      formData.append('email', tenantData.email || '');
+      formData.append('phone', tenantData.phone || '');
+      formData.append('status', tenantData.status || 'Applicant');
+      formData.append('property_unit', tenantData.propertyUnit || '');
+      formData.append('rent_amount', String(tenantData.rentAmount || 0));
+      formData.append('deposit', String(tenantData.deposit || 0));
+      formData.append('balance', String(tenantData.balance || 0));
+      
+      // Add application data as JSON string
+      if (tenantData.applicationData) {
+        formData.append('application_data', JSON.stringify(tenantData.applicationData));
+      }
+      
+      // Add file uploads
+      if (tenantData.photoIdFiles && tenantData.photoIdFiles.length > 0) {
+        tenantData.photoIdFiles.forEach((file: File) => {
+          formData.append('photo_id_files_upload', file);
+        });
+      }
+      
+      if (tenantData.incomeVerificationFiles && tenantData.incomeVerificationFiles.length > 0) {
+        tenantData.incomeVerificationFiles.forEach((file: File) => {
+          formData.append('income_verification_files_upload', file);
+        });
+      }
+      
+      body = formData;
+      headers = {}; // Don't set Content-Type for FormData, browser will set it with boundary
+    } else {
+      // Use JSON for regular submission without files
+      const backendData = api.mapTenantToBackend(tenantData);
+      body = JSON.stringify(backendData);
+      headers = getHeaders();
+    }
+    
     const response = await fetch(`${API_URL}/tenants/`, {
       method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(backendData),
+      headers,
+      body,
     });
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ detail: 'Failed to create tenant' }));
       // Handle Django REST Framework error format
@@ -203,14 +251,15 @@ export const api = {
         (errorData.non_field_errors && errorData.non_field_errors[0]) ||
         (typeof errorData === 'object' && Object.keys(errorData).length > 0 
           ? JSON.stringify(errorData) 
-          : 'Failed to create tenant');
+          : 'Application Failed');
       throw new Error(errorMessage);
     }
+    
     const data = await response.json();
     // Map backend response to frontend format
     return {
       ...data,
-      id: String(data.id), // Ensure ID is always a string
+      id: String(data.id),
       propertyUnit: data.property_unit,
       leaseStart: data.lease_start,
       leaseEnd: data.lease_end,

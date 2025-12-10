@@ -9,24 +9,64 @@ export enum TenantStatus {
 
 export interface ApplicationData {
   submissionDate: string;
-  employment: {
+  
+  // Property Preferences
+  propertyAddress?: string;
+  bedroomsDesired?: number[];
+  bathroomsDesired?: number[];
+  
+  // Personal Information
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  currentAddress?: string;
+  
+  // Occupants
+  otherOccupants?: string;
+  hasOtherAdults?: boolean;
+  
+  // Employment/Income
+  currentEmployer?: string;
+  monthlyIncome?: number;
+  
+  // Rental History
+  hasRentedRecently?: boolean;
+  previousLandlordInfo?: string;
+  hasEvictionOrFelony?: boolean;
+  evictionFelonyExplanation?: string;
+  
+  // Policies & Agreement
+  agreesToPolicy?: boolean;
+  desiredMoveInDate?: string;
+  emergencyContact?: string;
+  additionalNotes?: string;
+  certificationAgreed?: boolean;
+  
+  // Legacy fields
+  employment?: {
     employer: string;
     jobTitle: string;
     monthlyIncome: number;
     duration: string;
   };
-  references: {
+  references?: {
     name: string;
     relation: string;
     phone: string;
   }[];
-  documents: {
+  documents?: {
     name: string;
     url: string;
     type: 'ID' | 'Income' | 'Other';
   }[];
-  internalNotes: string;
+  internalNotes?: string;
   backgroundCheckId?: string;
+  ssnLast4?: string;
+  dob?: string;
+  jobTitle?: string;
+  employer?: string;
+  income?: string;
+  consentBackgroundCheck?: boolean;
 }
 
 export interface Tenant {
@@ -169,16 +209,48 @@ export interface Property {
 }
 
 export interface ApplicationForm {
+  // Property Preferences
+  propertyAddress: string;
+  bedroomsDesired: number[];
+  bathroomsDesired: number[];
+  
+  // Personal Information
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
-  dob: string;
+  dateOfBirth: string;
   currentAddress: string;
-  employer: string;
-  jobTitle: string;
-  income: string;
-  ssnLast4: string;
-  references: { name: string; relation: string; phone: string }[];
-  consentBackgroundCheck: boolean;
+  
+  // Occupants
+  otherOccupants: string;
+  hasOtherAdults: boolean | null;
+  photoIdFiles: File[];
+  
+  // Employment/Income
+  currentEmployer: string;
+  monthlyIncome: string;
+  incomeVerificationFiles: File[];
+  
+  // Rental History
+  hasRentedRecently: boolean | null;
+  previousLandlordInfo: string;
+  hasEvictionOrFelony: boolean | null;
+  evictionFelonyExplanation: string;
+  
+  // Policies & Agreement
+  agreesToPolicy: boolean;
+  desiredMoveInDate: string;
+  emergencyContact: string;
+  additionalNotes: string;
+  certificationAgreed: boolean;
+  
+  // Legacy fields (for backward compatibility)
+  dob?: string;
+  employer?: string;
+  jobTitle?: string;
+  income?: string;
+  ssnLast4?: string;
+  references?: { name: string; relation: string; phone: string }[];
+  consentBackgroundCheck?: boolean;
 }

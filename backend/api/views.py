@@ -39,6 +39,7 @@ class TenantViewSet(viewsets.ModelViewSet):
     queryset = Tenant.objects.all()
     serializer_class = TenantSerializer
     permission_classes = [AllowAny]  # Require auth for most operations
+    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
         
     def perform_create(self, serializer):
         tenant = serializer.save()
