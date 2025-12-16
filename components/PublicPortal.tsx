@@ -13,7 +13,7 @@ import {
   Wallet, DollarSign, Copy, Info, RefreshCw, Search, Shield, CheckCircle, CheckCircle2, Phone
 } from 'lucide-react';
 
-type PortalView = 'listings' | 'application' | 'dashboard' | 'lease_signing' | 'status_check';
+type PortalView = 'listings' | 'application' | 'dashboard' | 'lease_signing' | 'status_check' | 'status_tracker';
 type UserStatus = 'guest' | 'applicant_pending' | 'applicant_approved' | 'resident';
 type ResidentTab = 'overview' | 'payments' | 'maintenance' | 'documents';
 type PaymentSubTab = 'history' | 'payment-options';
@@ -264,8 +264,30 @@ const PublicPortal: React.FC<PublicPortalProps> = ({ onAdminLogin, tenantId, onM
   const [tempTenant, setTempTenant] = useState<Tenant | null>(null);
 
   // Status Check Handler
-  const handleStatusFound = (status: string, tenant: Tenant) => {
-    setTempTenant(tenant);
+  const handleStatusFound = (status: string, tenant: any) => {
+    // Map backend response (snake_case) to frontend format (camelCase)
+    const mappedTenant: Tenant = {
+      id: String(tenant.id),
+      name: tenant.name || '',
+      email: tenant.email || '',
+      phone: tenant.phone || '',
+      status: tenant.status || 'Applicant',
+      propertyUnit: tenant.property_unit || '',
+      leaseStart: tenant.lease_start || null,
+      leaseEnd: tenant.lease_end || null,
+      rentAmount: parseFloat(tenant.rent_amount || '0'),
+      deposit: parseFloat(tenant.deposit || '0'),
+      balance: parseFloat(tenant.balance || '0'),
+      creditScore: tenant.credit_score || null,
+      backgroundCheckStatus: tenant.background_check_status || null,
+      applicationData: tenant.application_data || null,
+      leaseStatus: tenant.lease_status || null,
+      signedLeaseUrl: tenant.signed_lease_url || null,
+      photoIdFiles: tenant.photo_id_files || [],
+      incomeVerificationFiles: tenant.income_verification_files || [],
+      backgroundCheckFiles: tenant.background_check_files || [],
+    };
+    setTempTenant(mappedTenant);
     setView('status_tracker');
   };
   
@@ -1962,9 +1984,10 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
                     <p className="text-indigo-200 text-lg mb-8">Browse our curated selection of premium rentals with transparent pricing and instant applications.</p>
                     
                     <div className="flex flex-wrap gap-4">
-                       <button onClick={() => setView('check_status')} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-lg shadow-emerald-200 transition-colors flex items-center gap-2">
+                       {/* Status check button - commented out for presentation */}
+                       {/* <button onClick={() => setView('check_status')} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-lg shadow-emerald-200 transition-colors flex items-center gap-2">
                           <Clock className="w-5 h-5" /> Check Application Status
-                       </button>
+                       </button> */}
                        <button onClick={() => setLoginType('tenant')} className="px-6 py-3 bg-white text-indigo-900 font-bold rounded-lg hover:bg-indigo-50 transition-colors">
                          Resident Login
                        </button>
@@ -2006,6 +2029,138 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
               onBack={() => setView('listings')} 
               onStatusFound={handleStatusFound} 
            />
+        )}
+
+        {/* 5. STATUS TRACKER VIEW */}
+        {view === 'status_tracker' && tempTenant && (
+          <div className="min-h-screen bg-slate-50">
+            <div className="max-w-4xl mx-auto px-4 md:px-8 py-12">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex items-center gap-4">
+                  <button 
+                    onClick={() => setView('check_status')} 
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <h2 className="text-xl font-bold text-slate-800">Application Status</h2>
+                </div>
+                
+                <div className="p-8 space-y-8">
+                  {/* Tenant Info */}
+                  <div className="bg-slate-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-4">Applicant Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-slate-500">Name</p>
+                        <p className="font-medium text-slate-800">{tempTenant.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">Email</p>
+                        <p className="font-medium text-slate-800">{tempTenant.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">Phone</p>
+                        <p className="font-medium text-slate-800">{tempTenant.phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">Status</p>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                          tempTenant.status === 'Active' ? 'bg-emerald-100 text-emerald-800' :
+                          tempTenant.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                          tempTenant.status === 'Applicant' ? 'bg-blue-100 text-blue-800' :
+                          tempTenant.status === 'Declined' ? 'bg-red-100 text-red-800' :
+                          tempTenant.status === 'Past' ? 'bg-slate-100 text-slate-800' :
+                          'bg-slate-100 text-slate-800'
+                        }`}>
+                          {tempTenant.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Timeline */}
+                  <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-6">Application Timeline</h3>
+                    <StatusTracker 
+                      status={
+                        tempTenant.status === 'Active' ? 'resident' :
+                        tempTenant.status === 'Approved' ? 'applicant_approved' :
+                        tempTenant.status === 'Applicant' ? 'applicant_pending' :
+                        tempTenant.status === 'Resident' ? 'resident' :
+                        tempTenant.status === 'Past' ? 'resident' :
+                        'applicant_pending'
+                      } 
+                      leaseStatus={tempTenant.leaseStatus} 
+                    />
+                  </div>
+
+                  {/* Status-specific messages */}
+                  {(tempTenant.status === 'Active' || tempTenant.status === 'Past') && (
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-8 flex flex-col items-center justify-center text-center">
+                      <CheckCircle className="w-12 h-12 text-emerald-600 mb-4" />
+                      <h3 className="text-2xl font-bold text-emerald-900 mb-2">
+                        {tempTenant.status === 'Active' ? 'Welcome! You\'re All Set' : 'Former Resident'}
+                      </h3>
+                      <p className="text-emerald-800 mb-6 max-w-lg">
+                        {tempTenant.status === 'Active' 
+                          ? 'Your application has been approved and you are now an active resident. You can access your resident portal to manage payments, maintenance requests, and more.'
+                          : 'You were previously a resident at this property.'}
+                      </p>
+                      {tempTenant.propertyUnit && (
+                        <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 text-sm text-emerald-800 flex items-center gap-3">
+                          <Building2 className="w-5 h-5 flex-shrink-0" />
+                          <span>Unit: {tempTenant.propertyUnit}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {tempTenant.status === 'Approved' && (
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-8 flex flex-col items-center justify-center text-center">
+                      <CheckCircle className="w-12 h-12 text-emerald-600 mb-4" />
+                      <h3 className="text-2xl font-bold text-emerald-900 mb-2">Application Approved!</h3>
+                      <p className="text-emerald-800 mb-6 max-w-lg">
+                        Your application has been approved. A lease agreement will be sent to your email address. Please check your inbox to review and sign.
+                      </p>
+                      {tempTenant.leaseStatus && (
+                        <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 text-sm text-emerald-800 flex items-center gap-3">
+                          <Mail className="w-5 h-5 flex-shrink-0" />
+                          <span>Lease Status: {tempTenant.leaseStatus}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {tempTenant.status === 'Applicant' && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-8 text-center">
+                      <Clock className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-blue-900 mb-2">Application Under Review</h3>
+                      <p className="text-blue-700">We are processing your application and background check. This usually takes 24-48 hours.</p>
+                    </div>
+                  )}
+
+                  {tempTenant.status === 'Declined' && (
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-8 text-center">
+                      <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-red-900 mb-2">Application Not Approved</h3>
+                      <p className="text-red-700">Unfortunately, your application was not approved at this time. Please contact us if you have any questions.</p>
+                    </div>
+                  )}
+
+                  {/* Back button */}
+                  <div className="flex justify-center pt-4">
+                    <button
+                      onClick={() => setView('check_status')}
+                      className="px-6 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none"
+                    >
+                      Check Another Application
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* 3. APPLICATION VIEW */}
