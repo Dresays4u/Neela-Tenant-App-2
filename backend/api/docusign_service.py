@@ -562,9 +562,14 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
             }
         }
         
+        # Serialize with default=str to handle bytes/non-serializable types if any
+        # Although our structure should be clean JSON types
+        envelope_json_str = json.dumps(envelope_json, default=str)
+        
         logger.info(f"Attempting raw REST API call to: {url}")
         
-        response = requests.post(url, headers=headers, json=envelope_json)
+        # Use data=envelope_json_str to ensure proper JSON serialization
+        response = requests.post(url, headers=headers, data=envelope_json_str)
         
         if response.status_code not in [200, 201]:
             logger.error(f"Raw API Call Failed: {response.status_code} - {response.text}")
