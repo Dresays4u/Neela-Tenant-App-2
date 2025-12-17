@@ -441,16 +441,16 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
             "tabs": {
                 "signHereTabs": [{
                     "anchorString": "Tenant's Signature:",
-                    "anchorYOffset": "-20", # Move up slightly to sit on line
-                    "anchorXOffset": "140", # Move right to be after the label
+                    "anchorYOffset": "-5", 
+                    "anchorXOffset": "140",
                     "anchorUnits": "pixels",
                     "documentId": "1",
                     "pageNumber": "1", # Optional with anchor
                 }],
                 "dateSignedTabs": [{
-                    "anchorString": "Tenant's Signature:",
-                    "anchorYOffset": "20", # Below signature
-                    "anchorXOffset": "140",
+                    "anchorString": "Date:",
+                    "anchorYOffset": "-5", 
+                    "anchorXOffset": "50",
                     "anchorUnits": "pixels",
                     "documentId": "1"
                 }],
@@ -519,15 +519,15 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
             "tabs": {
                 "signHereTabs": [{
                     "anchorString": "Landlord's Signature:",
-                    "anchorYOffset": "-20",
-                    "anchorXOffset": "140",
+                    "anchorYOffset": "-5",
+                    "anchorXOffset": "150",
                     "anchorUnits": "pixels",
                     "documentId": "1"
                 }],
                 "dateSignedTabs": [{
-                    "anchorString": "Landlord's Signature:",
-                    "anchorYOffset": "20",
-                    "anchorXOffset": "140",
+                    "anchorString": "Date:",
+                    "anchorYOffset": "-5",
+                    "anchorXOffset": "50",
                     "anchorUnits": "pixels",
                     "documentId": "1"
                 }]

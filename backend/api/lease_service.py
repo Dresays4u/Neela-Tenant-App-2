@@ -265,13 +265,12 @@ If Tenant fails to pay rent or breaches any term of this Lease, Landlord may ter
 8. SIGNATURES
 By signing below, both parties agree to the terms of this Lease.
 
-Landlord's Signature: _________________________
+Landlord's Signature: _________________________  Date: _________________________
 {{landlord_name}}
-Date: _________________________
 
-Tenant's Signature: _________________________
-{{tenant_name}}
-Date: _________________________"""
+
+Tenant's Signature: _________________________  Date: _________________________
+{{tenant_name}}"""
 
 
 def save_lease_document(tenant: Tenant, pdf_buffer: BytesIO, filled_content: str) -> LegalDocument:
