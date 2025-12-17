@@ -326,27 +326,35 @@ def save_lease_document(tenant: Tenant, pdf_buffer: BytesIO, filled_content: str
             # Or keep it and remove format="pdf"?
             # Cloudinary raw resources with format often duplicate extensions.
             
-            public_id = f"media/leases/{filename}" 
+            # IMPORTANT: For Cloudinary, keep public_id WITHOUT file extension.
+            # Cloudinary stores the "format" separately, and admin signed download URLs
+            # (private_download_url) expect a public_id without extension.
+            public_id = f"media/leases/{filename}"
+            if public_id.lower().endswith(".pdf"):
+                public_id = public_id[:-4]
             # if public_id.endswith('.pdf'):
             #     public_id = public_id[:-4]
 
             logger.info(f"Uploading lease PDF to Cloudinary with public_id: {public_id}")
             
-            # OPTION A: Make the PDF raw + public (Recommended for DocuSign)
-            # PDFs must be resource_type="raw" to be downloadable as PDF and viewable in browser without transformation oddities
-            # type="upload" makes it public so DocuSign can fetch it
+            # OPTION A: Upload PDF as raw + public.
+            # This does not guarantee CDN access (Cloudinary access control can still return 401),
+            # but it ensures the asset exists as a raw resource and can be fetched via
+            # Cloudinary admin-signed URLs for server-side retrieval.
             upload_result = cloudinary.uploader.upload(
                 pdf_buffer, 
                 resource_type="raw", 
                 public_id=public_id,
-                type="upload"  # Explicitly public
+                type="upload",  # public delivery type
+                format="pdf",
             )
             
             logger.info(f"Cloudinary upload successful. Result public_id: {upload_result.get('public_id')}")
             
-            # Manually set the file name/path to what Cloudinary returned
-            # Since we are using raw/upload, the path in DB should reflect that so our URL construction logic works
-            legal_doc.pdf_file.name = upload_result.get('public_id')
+            # Store a name with extension so downstream logic can infer format easily.
+            uploaded_public_id = upload_result.get('public_id') or public_id
+            uploaded_format = upload_result.get('format') or 'pdf'
+            legal_doc.pdf_file.name = f"{uploaded_public_id}.{uploaded_format}"
             legal_doc.save()
             
         except Exception as e:
@@ -417,16 +425,22 @@ def process_docusign_status_update(legal_doc: LegalDocument) -> dict:
                     if hasattr(settings, 'CLOUDINARY_STORAGE') and settings.CLOUDINARY_STORAGE.get('CLOUD_NAME'):
                         try:
                             import cloudinary.uploader
+                            # Keep public_id WITHOUT extension for Cloudinary raw assets.
                             public_id = f"media/signed_leases/{filename}"
+                            if public_id.lower().endswith(".pdf"):
+                                public_id = public_id[:-4]
                             logger.info(f"Uploading SIGNED lease to Cloudinary: {public_id}")
                             # Use raw/upload for signed leases too
                             upload_result = cloudinary.uploader.upload(
                                 signed_pdf_content, 
                                 resource_type="raw", 
                                 public_id=public_id,
-                                type="upload" # Explicitly public
+                                type="upload",  # Explicitly public
+                                format="pdf",
                             )
-                            legal_doc.pdf_file.name = upload_result.get('public_id')
+                            uploaded_public_id = upload_result.get('public_id') or public_id
+                            uploaded_format = upload_result.get('format') or 'pdf'
+                            legal_doc.pdf_file.name = f"{uploaded_public_id}.{uploaded_format}"
                         except Exception as e:
                             logger.error(f"Cloudinary upload failed for signed lease: {e}")
                             legal_doc.pdf_file.save(filename, ContentFile(signed_pdf_content), save=False)
