@@ -580,6 +580,10 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                 # raise Exception("Could not retrieve file from Cloudinary after multiple attempts.")
                                 pdf_content = None # Explicitly None to trigger fallback check
 
+                                # LAST RESORT: Just use the plain PDF URL from Django if we can't download
+                                if pdf_url:
+                                     logger.info(f"Using standard legal_doc.pdf_file.url as fallback: {pdf_url}")
+                                     # Let the DocuSign service try to download it
                         else:
                             raise read_error
 
