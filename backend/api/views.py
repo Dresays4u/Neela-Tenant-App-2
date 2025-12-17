@@ -501,89 +501,82 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                             # Generate a signed URL for the resource
                             resource_path = legal_doc.pdf_file.name
                             
-                            # CRITICAL FIX: Cloudinary storage backend might have stored the public_id WITHOUT the extension
-                            # OR with the extension. But 'resource_type="raw"' requires exact match.
-                            
-                            # If upload used f"leases/{filename}" where filename has .pdf, then public_id is "leases/foo.pdf"
-                            # But Cloudinary raw resources are tricky.
-                            
-                            # Try listing resources (if we could), but let's just try stripping 'media/' if present
-                            # Django storage might prepend 'media/' but Cloudinary public_id might not have it if we uploaded manually
-                            
                             logger.info(f"Original resource path from DB: {resource_path}")
                             
-                            # Strategy: Try variations of the path
-                            paths_to_try = [
-                                resource_path,
-                                resource_path.replace('media/', ''), # If media/ was prepended
-                                f"media/{resource_path}" if not resource_path.startswith('media/') else resource_path,
-                            ]
-                            
-                            # If it ends with .pdf, try without - but for RAW files, extension is usually part of ID
-                            if resource_path.lower().endswith('.pdf'):
-                                paths_to_try.append(resource_path[:-4])
-                                paths_to_try.append(resource_path.replace('media/', '')[:-4])
+                            # Clean up path - remove extension for ID logic if needed, but for raw/upload we usually want it
+                            # If DB path is 'media/leases/foo.pdf', that is the public_id
                             
                             pdf_content = None
                             
-                            for path in paths_to_try:
-                                if pdf_content: break
-                                
-                                logger.info(f"Trying path variant: {path}")
-                                
-                                # Try RAW signed (most likely for PDF documents)
+                            # HELPER: Try to fetch content from a URL
+                            def try_fetch_content(url, desc):
                                 try:
-                                    # Fix: Don't set type="private" implicitly, let sign_url handle it
-                                    # Cloudinary raw files are often type="upload" but might need signing if access control is on
-                                    # Or maybe we need type="private"
-                                    # Let's try explicit type="upload" first which is default public
-                                    
-                                    # Attempt 1: Raw Upload (Public/Signed)
-                                    signed_url, _ = cloudinary.utils.cloudinary_url(path, resource_type="raw", sign_url=True)
-                                    logger.info(f"Checking RAW URL: {signed_url}")
-                                    resp = requests.get(signed_url)
+                                    logger.info(f"Checking {desc} URL: {url}")
+                                    resp = requests.get(url, timeout=30)
                                     if resp.status_code == 200:
-                                        pdf_content = resp.content
-                                        logger.info(f"Success with RAW signed: {path}")
-                                        break
-                                    
-                                    # Attempt 2: Raw Private (if access control is strict)
-                                    signed_url_private, _ = cloudinary.utils.cloudinary_url(path, resource_type="raw", type="private", sign_url=True)
-                                    logger.info(f"Checking RAW PRIVATE URL: {signed_url_private}")
-                                    resp = requests.get(signed_url_private)
-                                    if resp.status_code == 200:
-                                        pdf_content = resp.content
-                                        logger.info(f"Success with RAW PRIVATE signed: {path}")
-                                        break
-                                        
-                                    logger.warning(f"RAW URL failed: {resp.status_code}")
-                                except Exception as e:
-                                    logger.warning(f"Error generating/fetching RAW URL for {path}: {e}")
-                                    
-                                # Try IMAGE signed (fallback for older files or if uploaded as image/auto)
-                                try:
-                                    signed_url_img, _ = cloudinary.utils.cloudinary_url(path, resource_type="image", sign_url=True)
-                                    logger.info(f"Checking IMAGE URL: {signed_url_img}")
-                                    resp = requests.get(signed_url_img)
-                                    if resp.status_code == 200:
-                                        pdf_content = resp.content
-                                        logger.info(f"Success with IMAGE signed: {path}")
-                                        break
+                                        logger.info(f"Success with {desc}: {url}")
+                                        return resp.content
                                     else:
-                                        logger.warning(f"IMAGE URL failed: {resp.status_code}")
+                                        logger.warning(f"{desc} URL failed: {resp.status_code}")
+                                        return None
                                 except Exception as e:
-                                    logger.warning(f"Error generating/fetching IMAGE URL for {path}: {e}")
+                                    logger.warning(f"Error fetching {desc} URL: {e}")
+                                    return None
+
+                            # STRATEGY 1: Public RAW URL (Preferred for DocuSign)
+                            # https://res.cloudinary.com/<cloud_name>/raw/upload/v1/<public_id>
+                            
+                            # Construct public raw URL manually
+                            cloud_name = settings.CLOUDINARY_STORAGE['CLOUD_NAME']
+                            
+                            # Ensure resource_path doesn't have leading slashes
+                            clean_path = resource_path.lstrip('/')
+                            
+                            # Try with and without versioning
+                            # Standard raw public URL:
+                            raw_public_url = f"https://res.cloudinary.com/{cloud_name}/raw/upload/{clean_path}"
+                            pdf_content = try_fetch_content(raw_public_url, "RAW PUBLIC")
+                            
+                            if pdf_content:
+                                # Update pdf_url to be this valid public URL so DocuSign can use it directly if needed
+                                pdf_url = raw_public_url
+                            
+                            # STRATEGY 2: Signed URL (if it was private)
+                            if not pdf_content:
+                                try:
+                                    # Try generating a signed URL for 'raw'
+                                    signed_url, _ = cloudinary.utils.cloudinary_url(clean_path, resource_type="raw", sign_url=True)
+                                    pdf_content = try_fetch_content(signed_url, "RAW SIGNED")
+                                    
+                                    if pdf_content and not pdf_url:
+                                        pdf_url = signed_url
+                                except Exception as e:
+                                    logger.warning(f"Error generating raw signed URL: {e}")
+
+                            # STRATEGY 3: Image URL (Fallback if uploaded as auto/image)
+                            if not pdf_content:
+                                try:
+                                    # Try generating a signed URL for 'image'
+                                    signed_url_img, _ = cloudinary.utils.cloudinary_url(clean_path, resource_type="image", sign_url=True)
+                                    pdf_content = try_fetch_content(signed_url_img, "IMAGE SIGNED")
+                                    
+                                    if pdf_content and not pdf_url:
+                                        pdf_url = signed_url_img
+                                except Exception as e:
+                                    logger.warning(f"Error generating image signed URL: {e}")
 
                             if not pdf_content:
                                 logger.error("All retrieval attempts failed for Cloudinary file.")
-                                # Fallback: return None here, so we can fail gracefully or check if we have URL
-                                # raise Exception("Could not retrieve file from Cloudinary after multiple attempts.")
                                 pdf_content = None # Explicitly None to trigger fallback check
 
                                 # LAST RESORT: Just use the plain PDF URL from Django if we can't download
-                                if pdf_url:
-                                     logger.info(f"Using standard legal_doc.pdf_file.url as fallback: {pdf_url}")
-                                     # Let the DocuSign service try to download it
+                                if legal_doc.pdf_file.url:
+                                     fallback_url = legal_doc.pdf_file.url
+                                     # If it's a standard image upload URL but we know it's raw now, maybe fix it?
+                                     # But let's just trust the URL field if all else fails.
+                                     logger.info(f"Using standard legal_doc.pdf_file.url as fallback: {fallback_url}")
+                                     if not pdf_url:
+                                         pdf_url = fallback_url
                         else:
                             raise read_error
 

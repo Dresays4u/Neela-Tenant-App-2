@@ -332,23 +332,20 @@ def save_lease_document(tenant: Tenant, pdf_buffer: BytesIO, filled_content: str
 
             logger.info(f"Uploading lease PDF to Cloudinary with public_id: {public_id}")
             
-            # Use 'auto' instead of 'raw' to better support PDF viewing/URL generation in Django
-            # PDFs are often treated as images by Cloudinary
+            # OPTION A: Make the PDF raw + public (Recommended for DocuSign)
+            # PDFs must be resource_type="raw" to be downloadable as PDF and viewable in browser without transformation oddities
+            # type="upload" makes it public so DocuSign can fetch it
             upload_result = cloudinary.uploader.upload(
                 pdf_buffer, 
-                resource_type="auto", 
+                resource_type="raw", 
                 public_id=public_id,
-                # format="pdf"  # Removed format to avoid double extension or raw/image confusion
+                type="upload"  # Explicitly public
             )
             
             logger.info(f"Cloudinary upload successful. Result public_id: {upload_result.get('public_id')}")
             
-            # Manually set the file name/path to what Cloudinary returned or the expected path
-            # django-cloudinary-storage typically expects just the name if configured correctly, 
-            # but storing the public_id ensures we can retrieve it.
-            # Using the SECURE url directly if available, otherwise public_id
-            
-            # Store the public_id, which likely includes the extension for 'auto' uploads if we provided it
+            # Manually set the file name/path to what Cloudinary returned
+            # Since we are using raw/upload, the path in DB should reflect that so our URL construction logic works
             legal_doc.pdf_file.name = upload_result.get('public_id')
             legal_doc.save()
             
@@ -422,11 +419,12 @@ def process_docusign_status_update(legal_doc: LegalDocument) -> dict:
                             import cloudinary.uploader
                             public_id = f"media/signed_leases/{filename}"
                             logger.info(f"Uploading SIGNED lease to Cloudinary: {public_id}")
-                            # Use auto for signed leases too
+                            # Use raw/upload for signed leases too
                             upload_result = cloudinary.uploader.upload(
                                 signed_pdf_content, 
-                                resource_type="auto", 
-                                public_id=public_id
+                                resource_type="raw", 
+                                public_id=public_id,
+                                type="upload" # Explicitly public
                             )
                             legal_doc.pdf_file.name = upload_result.get('public_id')
                         except Exception as e:

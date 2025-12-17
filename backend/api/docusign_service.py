@@ -409,12 +409,17 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
             # Download PDF from URL
             logger.info(f"Downloading PDF from {pdf_url}")
             try:
-                pdf_response = requests.get(pdf_url, timeout=30)
+                # Add headers to mimic a browser, sometimes helps with strict CDNs
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+                pdf_response = requests.get(pdf_url, timeout=30, headers=headers)
+                
                 if pdf_response.status_code != 200:
                     logger.error(f"Failed to download PDF: {pdf_response.status_code}")
-                    # Don't return None immediately, we might have valid base64 in subsequent attempts or if caller provided fallback?
-                    # But here, we have no content.
+                    # If we fail here, we really have no content. Return None.
                     return None
+                    
                 pdf_bytes = pdf_response.content
                 pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
             except Exception as e:
