@@ -533,6 +533,12 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                 
                                 # Try RAW signed (most likely for PDF documents)
                                 try:
+                                    # Fix: Don't set type="private" implicitly, let sign_url handle it
+                                    # Cloudinary raw files are often type="upload" but might need signing if access control is on
+                                    # Or maybe we need type="private"
+                                    # Let's try explicit type="upload" first which is default public
+                                    
+                                    # Attempt 1: Raw Upload (Public/Signed)
                                     signed_url, _ = cloudinary.utils.cloudinary_url(path, resource_type="raw", sign_url=True)
                                     logger.info(f"Checking RAW URL: {signed_url}")
                                     resp = requests.get(signed_url)
@@ -540,8 +546,17 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                         pdf_content = resp.content
                                         logger.info(f"Success with RAW signed: {path}")
                                         break
-                                    else:
-                                        logger.warning(f"RAW URL failed: {resp.status_code}")
+                                    
+                                    # Attempt 2: Raw Private (if access control is strict)
+                                    signed_url_private, _ = cloudinary.utils.cloudinary_url(path, resource_type="raw", type="private", sign_url=True)
+                                    logger.info(f"Checking RAW PRIVATE URL: {signed_url_private}")
+                                    resp = requests.get(signed_url_private)
+                                    if resp.status_code == 200:
+                                        pdf_content = resp.content
+                                        logger.info(f"Success with RAW PRIVATE signed: {path}")
+                                        break
+                                        
+                                    logger.warning(f"RAW URL failed: {resp.status_code}")
                                 except Exception as e:
                                     logger.warning(f"Error generating/fetching RAW URL for {path}: {e}")
                                     
