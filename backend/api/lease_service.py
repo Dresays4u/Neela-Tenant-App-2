@@ -381,7 +381,7 @@ def process_docusign_status_update(legal_doc: LegalDocument) -> dict:
         Dictionary with status information and results of any actions taken
     """
     from .docusign_service import get_envelope_status, get_envelope_recipients, download_signed_document
-    from .email_service import send_lease_signed_confirmation, send_acceptance_email_to_user
+    from .email_service import send_lease_signed_confirmation, send_acceptance_email_to_user, send_landlord_lease_ready_to_sign
     from accounts.user_service import create_user_from_tenant, generate_password_reset_token, get_password_reset_url
     from django.utils import timezone
     from django.core.files.base import ContentFile
@@ -517,6 +517,13 @@ def process_docusign_status_update(legal_doc: LegalDocument) -> dict:
                         result['updated'] = True
                         result['status'] = legal_doc.status
                         result['actions'].append('marked_tenant_signed')
+                        # Notify landlord/admin to sign (send once on transition)
+                        try:
+                            send_landlord_lease_ready_to_sign.delay(legal_doc.id)
+                            result['actions'].append('sent_landlord_signing_notification')
+                        except Exception:
+                            send_landlord_lease_ready_to_sign(legal_doc.id)
+                            result['actions'].append('sent_landlord_signing_notification_sync')
                 elif tenant_completed and landlord_completed:
                     # In theory envelope should be completed, but handle just in case
                     if legal_doc.status != 'Signed':

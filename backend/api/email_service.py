@@ -1290,6 +1290,64 @@ def _send_lease_signed_confirmation(legal_document_id):
         )
 
 
+def _send_landlord_lease_ready_to_sign(legal_document_id: int):
+    """
+    Internal function to notify the landlord/admin that the tenant has signed and landlord should now sign.
+    This is separate from DocuSign's own routing emails.
+    """
+    from .models import LegalDocument
+
+    try:
+        legal_doc = LegalDocument.objects.select_related('tenant').get(id=legal_document_id)
+    except LegalDocument.DoesNotExist:
+        logger.error(f"Legal document with ID {legal_document_id} not found for landlord signing notification.")
+        return
+
+    landlord_email = getattr(settings, 'LANDLORD_EMAIL', None)
+    landlord_name = getattr(settings, 'LANDLORD_NAME', 'Landlord')
+    if not landlord_email:
+        logger.warning("LANDLORD_EMAIL not configured; cannot send landlord signing notification.")
+        return
+
+    subject = f"Tenant Signed Lease — Please Sign (DocuSign) — {legal_doc.tenant.property_unit}"
+
+    message = f"""
+    Tenant Signed Lease — Landlord Signature Required
+
+    Hello {landlord_name},
+
+    The tenant has completed their signature for the lease agreement.
+
+    Tenant: {legal_doc.tenant.name}
+    Property Unit: {legal_doc.tenant.property_unit}
+
+    Please sign the lease in DocuSign (check your DocuSign inbox for the signing email).
+
+    Thanks,
+    Neela Property Management Team
+    """
+
+    send_email_with_logging(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[landlord_email],
+        email_type=f"landlord signing notification (document {legal_doc.id})"
+    )
+
+
+@shared_task
+def send_landlord_lease_ready_to_sign(legal_document_id: int):
+    """
+    Celery task to notify landlord/admin to sign after tenant has signed.
+    """
+    email_backend = getattr(settings, 'EMAIL_BACKEND', 'unknown')
+    logger.info(
+        f"Celery task executing: send_landlord_lease_ready_to_sign for document {legal_document_id}, using email backend: {email_backend}"
+    )
+    _send_landlord_lease_ready_to_sign(legal_document_id)
+
+
 
 @shared_task
 def send_lease_signed_confirmation(legal_document_id):
