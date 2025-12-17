@@ -553,6 +553,33 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                 except Exception as e:
                                     logger.warning(f"Error generating raw signed URL: {e}")
 
+                            # STRATEGY 2b: Admin-signed download URL (works even when CDN returns 401)
+                            # Some Cloudinary accounts enable access control/authenticated delivery, causing 401 on CDN URLs.
+                            # In that case, use the Admin API signed download URL to fetch bytes server-side.
+                            if not pdf_content:
+                                try:
+                                    # private_download_url signature: (public_id, format, **options)
+                                    # public_id should NOT include extension.
+                                    public_id = clean_path
+                                    file_format = "pdf"
+                                    if public_id.lower().endswith(".pdf"):
+                                        public_id = public_id[:-4]
+
+                                    if hasattr(cloudinary.utils, "private_download_url"):
+                                        dl_url = cloudinary.utils.private_download_url(
+                                            public_id,
+                                            file_format,
+                                            resource_type="raw",
+                                            type="upload",
+                                        )
+                                        pdf_content = try_fetch_content(dl_url, "RAW PRIVATE_DOWNLOAD")
+                                        if pdf_content and not pdf_url:
+                                            pdf_url = dl_url
+                                    else:
+                                        logger.warning("cloudinary.utils.private_download_url not available in this Cloudinary SDK version")
+                                except Exception as e:
+                                    logger.warning(f"Error generating/fetching private download URL: {e}")
+
                             # STRATEGY 3: Image URL (Fallback if uploaded as auto/image)
                             if not pdf_content:
                                 try:
