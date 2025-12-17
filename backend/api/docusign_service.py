@@ -722,6 +722,48 @@ def get_envelope_status(envelope_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def get_envelope_recipients(envelope_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get detailed recipient (signer) status for a DocuSign envelope.
+    Useful for partial progress (e.g., tenant signed but landlord not yet).
+    """
+    if not is_docusign_configured():
+        return None
+    if not DOCUSIGN_SDK_AVAILABLE:
+        return None
+
+    try:
+        api_client = get_docusign_api_client()
+        if not api_client:
+            return None
+
+        base_path = _docusign_token_cache.get('base_path') or get_docusign_config()['base_path']
+        resolved_account_id = _docusign_token_cache.get('account_id') or get_docusign_config()['account_id']
+        access_token = _docusign_token_cache.get('access_token')
+
+        if not access_token:
+            logger.error("No access token available for recipients check")
+            return None
+
+        if '/v2.1' not in base_path:
+            base_path = base_path + '/v2.1'
+
+        url = f"{base_path}/accounts/{resolved_account_id}/envelopes/{envelope_id}/recipients"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        logger.debug(f"Getting recipients for envelope {envelope_id} via RAW request")
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            logger.error(f"Error getting envelope recipients: {response.status_code} - {response.text}")
+            return None
+        return response.json()
+    except Exception as e:
+        logger.error(f"Error getting DocuSign envelope recipients: {e}", exc_info=True)
+        return None
+
+
 def download_signed_document(envelope_id: str) -> Optional[bytes]:
     """
     Download the signed document from DocuSign.

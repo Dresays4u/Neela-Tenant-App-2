@@ -534,12 +534,14 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                             
                             # Try with and without versioning
                             # Standard raw public URL:
+                            # Try both with and without ".pdf" extension
                             raw_public_url = f"https://res.cloudinary.com/{cloud_name}/raw/upload/{clean_path}"
-                            pdf_content = try_fetch_content(raw_public_url, "RAW PUBLIC")
+                            raw_public_url_pdf = raw_public_url if clean_path.lower().endswith(".pdf") else f"{raw_public_url}.pdf"
+                            pdf_content = try_fetch_content(raw_public_url_pdf, "RAW PUBLIC")
                             
                             if pdf_content:
                                 # Update pdf_url to be this valid public URL so DocuSign can use it directly if needed
-                                pdf_url = raw_public_url
+                                pdf_url = raw_public_url_pdf
                             
                             # STRATEGY 2: Signed URL (if it was private)
                             if not pdf_content:
@@ -699,6 +701,61 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to send lease via DocuSign: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        """
+        Proxy the lease PDF through the backend (authenticated), avoiding Cloudinary CDN 401/404.
+        GET /api/legal-documents/{id}/pdf/
+        """
+        legal_doc = self.get_object()
+        if not legal_doc.pdf_file:
+            return Response({'error': 'No PDF found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Try reading from storage directly first
+        pdf_bytes = None
+        try:
+            legal_doc.pdf_file.open('rb')
+            pdf_bytes = legal_doc.pdf_file.read()
+            legal_doc.pdf_file.close()
+        except Exception as read_error:
+            logger.warning(f"Standard file read failed for PDF proxy, attempting Cloudinary admin download: {read_error}")
+            # Cloudinary admin-signed download fallback
+            try:
+                import cloudinary
+                import cloudinary.utils
+
+                if hasattr(settings, 'CLOUDINARY_STORAGE') and settings.CLOUDINARY_STORAGE.get('CLOUD_NAME'):
+                    if not cloudinary.config().api_secret:
+                        cloudinary.config(
+                            cloud_name=settings.CLOUDINARY_STORAGE['CLOUD_NAME'],
+                            api_key=settings.CLOUDINARY_STORAGE['API_KEY'],
+                            api_secret=settings.CLOUDINARY_STORAGE['API_SECRET']
+                        )
+
+                public_id = (legal_doc.pdf_file.name or "").lstrip("/")
+                if public_id.lower().endswith(".pdf"):
+                    public_id = public_id[:-4]
+
+                if hasattr(cloudinary.utils, "private_download_url"):
+                    dl_url = cloudinary.utils.private_download_url(
+                        public_id,
+                        "pdf",
+                        resource_type="raw",
+                        type="upload",
+                    )
+                    resp = requests.get(dl_url, timeout=30)
+                    if resp.status_code == 200:
+                        pdf_bytes = resp.content
+                    else:
+                        logger.error(f"Cloudinary private download failed for PDF proxy: {resp.status_code}")
+            except Exception as e:
+                logger.error(f"Cloudinary fallback failed for PDF proxy: {e}", exc_info=True)
+
+        if not pdf_bytes:
+            return Response({'error': 'Could not retrieve PDF'}, status=status.HTTP_404_NOT_FOUND)
+
+        return HttpResponse(pdf_bytes, content_type="application/pdf")
 
     @action(detail=True, methods=['get', 'post'])
     def check_status(self, request, pk=None):

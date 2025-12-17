@@ -351,10 +351,10 @@ def save_lease_document(tenant: Tenant, pdf_buffer: BytesIO, filled_content: str
             
             logger.info(f"Cloudinary upload successful. Result public_id: {upload_result.get('public_id')}")
             
-            # Store a name with extension so downstream logic can infer format easily.
+            # IMPORTANT: django-cloudinary-storage expects `name` to be the Cloudinary public_id
+            # (WITHOUT the extension). If we store "foo.pdf" here, Cloudinary URLs can become "foo.pdf.pdf".
             uploaded_public_id = upload_result.get('public_id') or public_id
-            uploaded_format = upload_result.get('format') or 'pdf'
-            legal_doc.pdf_file.name = f"{uploaded_public_id}.{uploaded_format}"
+            legal_doc.pdf_file.name = uploaded_public_id
             legal_doc.save()
             
         except Exception as e:
@@ -380,7 +380,7 @@ def process_docusign_status_update(legal_doc: LegalDocument) -> dict:
     Returns:
         Dictionary with status information and results of any actions taken
     """
-    from .docusign_service import get_envelope_status, download_signed_document
+    from .docusign_service import get_envelope_status, get_envelope_recipients, download_signed_document
     from .email_service import send_lease_signed_confirmation, send_acceptance_email_to_user
     from accounts.user_service import create_user_from_tenant, generate_password_reset_token, get_password_reset_url
     from django.utils import timezone
@@ -439,8 +439,7 @@ def process_docusign_status_update(legal_doc: LegalDocument) -> dict:
                                 format="pdf",
                             )
                             uploaded_public_id = upload_result.get('public_id') or public_id
-                            uploaded_format = upload_result.get('format') or 'pdf'
-                            legal_doc.pdf_file.name = f"{uploaded_public_id}.{uploaded_format}"
+                            legal_doc.pdf_file.name = uploaded_public_id
                         except Exception as e:
                             logger.error(f"Cloudinary upload failed for signed lease: {e}")
                             legal_doc.pdf_file.save(filename, ContentFile(signed_pdf_content), save=False)
@@ -498,10 +497,39 @@ def process_docusign_status_update(legal_doc: LegalDocument) -> dict:
                      result['errors'] = str(e)
 
         elif ds_status in ['sent', 'delivered']:
-             # Handle partial status updates if needed
-             # 'sent': Email sent to current recipient
-             # 'delivered': Recipient has viewed the document
-             pass
+            # Partial progress: tenant may have completed, landlord pending (routing order 2).
+            recipients = get_envelope_recipients(legal_doc.docusign_envelope_id)
+            try:
+                signers = (recipients or {}).get('signers') or []
+                signer_by_id = {str(s.get('recipientId')): s for s in signers if isinstance(s, dict)}
+                tenant_signer = signer_by_id.get('1')
+                landlord_signer = signer_by_id.get('2')
+
+                tenant_completed = (tenant_signer or {}).get('status') == 'completed'
+                landlord_completed = (landlord_signer or {}).get('status') == 'completed'
+
+                if tenant_completed and not landlord_completed:
+                    if legal_doc.status != 'Tenant Signed':
+                        legal_doc.status = 'Tenant Signed'
+                        legal_doc.save()
+                        legal_doc.tenant.lease_status = 'Tenant Signed'
+                        legal_doc.tenant.save()
+                        result['updated'] = True
+                        result['status'] = legal_doc.status
+                        result['actions'].append('marked_tenant_signed')
+                elif tenant_completed and landlord_completed:
+                    # In theory envelope should be completed, but handle just in case
+                    if legal_doc.status != 'Signed':
+                        legal_doc.status = 'Signed'
+                        legal_doc.signed_at = timezone.now()
+                        legal_doc.save()
+                        legal_doc.tenant.lease_status = 'Signed'
+                        legal_doc.tenant.save()
+                        result['updated'] = True
+                        result['status'] = legal_doc.status
+                        result['actions'].append('marked_signed_from_recipients')
+            except Exception as e:
+                logger.warning(f"Error processing partial recipient status: {e}")
 
 
         elif ds_status in ['declined', 'voided']:
