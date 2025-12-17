@@ -523,89 +523,101 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                     logger.warning(f"Error fetching {desc} URL: {e}")
                                     return None
 
-                            # STRATEGY 1: Public RAW URL (Preferred for DocuSign)
-                            # https://res.cloudinary.com/<cloud_name>/raw/upload/v1/<public_id>
-                            
-                            # Construct public raw URL manually
+                            # Cloudinary in this environment returns 401 for CDN URLs (access control/authenticated delivery).
+                            # For DocuSign we must retrieve the PDF BYTES server-side.
                             cloud_name = settings.CLOUDINARY_STORAGE['CLOUD_NAME']
-                            
-                            # Ensure resource_path doesn't have leading slashes
+
                             clean_path = resource_path.lstrip('/')
-                            
-                            # Try with and without versioning
-                            # Standard raw public URL:
-                            # Try both with and without ".pdf" extension
-                            raw_public_url = f"https://res.cloudinary.com/{cloud_name}/raw/upload/{clean_path}"
-                            raw_public_url_pdf = raw_public_url if clean_path.lower().endswith(".pdf") else f"{raw_public_url}.pdf"
-                            pdf_content = try_fetch_content(raw_public_url_pdf, "RAW PUBLIC")
-                            
-                            if pdf_content:
-                                # Update pdf_url to be this valid public URL so DocuSign can use it directly if needed
-                                pdf_url = raw_public_url_pdf
-                            
-                            # STRATEGY 2: Signed URL (if it was private)
-                            if not pdf_content:
-                                try:
-                                    # Try generating a signed URL for 'raw'
-                                    signed_url, _ = cloudinary.utils.cloudinary_url(clean_path, resource_type="raw", sign_url=True)
-                                    pdf_content = try_fetch_content(signed_url, "RAW SIGNED")
-                                    
-                                    if pdf_content and not pdf_url:
-                                        pdf_url = signed_url
-                                except Exception as e:
-                                    logger.warning(f"Error generating raw signed URL: {e}")
 
-                            # STRATEGY 2b: Admin-signed download URL (works even when CDN returns 401)
-                            # Some Cloudinary accounts enable access control/authenticated delivery, causing 401 on CDN URLs.
-                            # In that case, use the Admin API signed download URL to fetch bytes server-side.
-                            if not pdf_content:
-                                try:
-                                    # private_download_url signature: (public_id, format, **options)
-                                    # public_id should NOT include extension.
-                                    public_id = clean_path
-                                    file_format = "pdf"
-                                    if public_id.lower().endswith(".pdf"):
-                                        public_id = public_id[:-4]
+                            # Candidates:
+                            # - Public IDs with/without ".pdf" (some uploads historically included extension in public_id)
+                            # - Delivery types: upload/authenticated/private
+                            candidate_public_ids = []
+                            if clean_path:
+                                candidate_public_ids.append(clean_path)
+                                if clean_path.lower().endswith('.pdf'):
+                                    candidate_public_ids.append(clean_path[:-4])
+                                else:
+                                    candidate_public_ids.append(f"{clean_path}.pdf")
 
-                                    if hasattr(cloudinary.utils, "private_download_url"):
-                                        dl_url = cloudinary.utils.private_download_url(
-                                            public_id,
-                                            file_format,
+                            candidate_types = ["upload", "authenticated", "private"]
+
+                            pdf_content = None
+                            chosen_url = None
+
+                            for t in candidate_types:
+                                if pdf_content:
+                                    break
+                                for pid in candidate_public_ids:
+                                    if pdf_content:
+                                        break
+
+                                    # 1) Try direct CDN raw URL (may 401)
+                                    raw_url = f"https://res.cloudinary.com/{cloud_name}/raw/{t}/{pid}"
+                                    pdf_content = try_fetch_content(raw_url, f"RAW {t.upper()} CDN")
+                                    if pdf_content:
+                                        chosen_url = raw_url
+                                        break
+
+                                    # 2) Try signed CDN URL (may still 401 if access control requires auth token)
+                                    try:
+                                        signed_url, _ = cloudinary.utils.cloudinary_url(
+                                            pid,
                                             resource_type="raw",
-                                            type="upload",
+                                            type=t,
+                                            sign_url=True
                                         )
-                                        pdf_content = try_fetch_content(dl_url, "RAW PRIVATE_DOWNLOAD")
-                                        if pdf_content and not pdf_url:
-                                            pdf_url = dl_url
-                                    else:
-                                        logger.warning("cloudinary.utils.private_download_url not available in this Cloudinary SDK version")
-                                except Exception as e:
-                                    logger.warning(f"Error generating/fetching private download URL: {e}")
+                                        pdf_content = try_fetch_content(signed_url, f"RAW {t.upper()} SIGNED")
+                                        if pdf_content:
+                                            chosen_url = signed_url
+                                            break
+                                    except Exception as e:
+                                        logger.warning(f"Error generating raw signed URL for type={t}, pid={pid}: {e}")
 
-                            # STRATEGY 3: Image URL (Fallback if uploaded as auto/image)
-                            if not pdf_content:
-                                try:
-                                    # Try generating a signed URL for 'image'
-                                    signed_url_img, _ = cloudinary.utils.cloudinary_url(clean_path, resource_type="image", sign_url=True)
-                                    pdf_content = try_fetch_content(signed_url_img, "IMAGE SIGNED")
-                                    
-                                    if pdf_content and not pdf_url:
-                                        pdf_url = signed_url_img
-                                except Exception as e:
-                                    logger.warning(f"Error generating image signed URL: {e}")
+                                    # 3) Try Cloudinary Admin signed download URL (most reliable for server-side)
+                                    try:
+                                        if hasattr(cloudinary.utils, "private_download_url"):
+                                            # private_download_url expects public_id WITHOUT extension generally,
+                                            # but for legacy assets we try both stripped and unstripped.
+                                            base_pid = pid[:-4] if pid.lower().endswith(".pdf") else pid
+                                            dl_url = cloudinary.utils.private_download_url(
+                                                base_pid,
+                                                "pdf",
+                                                resource_type="raw",
+                                                type=t,
+                                            )
+                                            pdf_content = try_fetch_content(dl_url, f"RAW {t.upper()} PRIVATE_DOWNLOAD")
+                                            if not pdf_content and base_pid != pid:
+                                                # Try again using the full pid as public_id (legacy)
+                                                dl_url2 = cloudinary.utils.private_download_url(
+                                                    pid,
+                                                    "pdf",
+                                                    resource_type="raw",
+                                                    type=t,
+                                                )
+                                                pdf_content = try_fetch_content(dl_url2, f"RAW {t.upper()} PRIVATE_DOWNLOAD (LEGACY PID)")
+                                                if pdf_content:
+                                                    chosen_url = dl_url2
+                                                    break
+                                            if pdf_content:
+                                                chosen_url = dl_url
+                                                break
+                                        else:
+                                            logger.warning("cloudinary.utils.private_download_url not available in this Cloudinary SDK version")
+                                    except Exception as e:
+                                        logger.warning(f"Error generating/fetching private download URL for type={t}, pid={pid}: {e}")
 
                             if not pdf_content:
                                 logger.error("All retrieval attempts failed for Cloudinary file.")
                                 pdf_content = None # Explicitly None to trigger fallback check
 
-                                # LAST RESORT: Just use the plain PDF URL from Django if we can't download
-                                if legal_doc.pdf_file.url:
-                                     fallback_url = legal_doc.pdf_file.url
-                                     # If it's a standard image upload URL but we know it's raw now, maybe fix it?
-                                     # But let's just trust the URL field if all else fails.
-                                     logger.info(f"Using standard legal_doc.pdf_file.url as fallback: {fallback_url}")
-                                     if not pdf_url:
-                                         pdf_url = fallback_url
+                                # IMPORTANT: Do NOT fall back to obj.pdf_file.url for DocuSign in this environment.
+                                # It points to Cloudinary /image/upload/ URLs which 404 for PDFs, or yields 401 due to access control.
+                                # If we can't fetch bytes, we must fail loudly.
+                                logger.error("Cloudinary retrieval failed; refusing to fall back to pdf_file.url for DocuSign.")
+                            else:
+                                # Ensure DocuSign receives bytes; url is optional
+                                pdf_url = chosen_url or pdf_url
                         else:
                             raise read_error
 
@@ -616,9 +628,9 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
             # BUT: DocuSign needs a public URL. Cloudinary raw/private URLs might not work if they expire quickly or need auth headers not supported by DocuSign fetch.
             # AND: We prefer sending base64 content.
             
-            if not pdf_url and not pdf_content:
+            if not pdf_content:
                 return Response(
-                    {'error': 'Could not generate PDF URL or read content.'},
+                    {'error': 'Could not retrieve PDF bytes from storage (Cloudinary access control).'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
