@@ -221,7 +221,7 @@ SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
 if SENDGRID_API_KEY:
     EMAIL_BACKEND = "api.sendgrid_backend.SendGridBackend"
 
-    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'neela@example.com')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'neelacapital@outlook.com')
 else:
     # Fallback to SMTP (or Console in Debug)
     EMAIL_BACKEND = os.environ.get(
