@@ -401,7 +401,7 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
         if not landlord_name:
             landlord_name = (getattr(settings, 'LANDLORD_NAME', None) or 'Rosa Martinez')
         landlord_name = str(landlord_name).strip() if landlord_name else 'Rosa Martinez'
-
+        
         pdf_base64 = None
         
         if pdf_content:
@@ -442,28 +442,6 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
             "documentId": "1"
         }
         
-        # Generate dynamic tabs for visual anchors
-        dynamic_text_tabs = []
-        for i in range(1, 151):
-            dynamic_text_tabs.append({
-                "anchorString": f"/txt{i}/",
-                "anchorYOffset": "-2", 
-                "anchorXOffset": "0",
-                "width": "150", 
-                "documentId": "1", 
-                "tabLabel": f"Text Field {i}" 
-            })
-
-        dynamic_checkbox_tabs = []
-        for i in range(1, 101):
-            dynamic_checkbox_tabs.append({
-                "anchorString": f"/chk{i}/",
-                "anchorYOffset": "0",
-                "anchorXOffset": "-20", # Shift left to cover [ ]
-                "documentId": "1", 
-                "tabLabel": f"Checkbox {i}"
-            })
-        
         # --- RECIPIENT 1: TENANT ---
         # Tenant signs first (routing order 1)
         # Tabs: Signature, Date, Text Fields (___), Checkboxes ([ ])
@@ -482,13 +460,7 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
                     "documentId": "1",
                     "pageNumber": "1", # Optional with anchor
                 }],
-                "dateSignedTabs": [{
-                    "anchorString": "Date:",
-                    "anchorYOffset": "-5", 
-                    "anchorXOffset": "50",
-                    "anchorUnits": "pixels",
-                    "documentId": "1"
-                }],
+                # Date tab removed as per request (pre-filled)
                 # Auto-place text fields for missing info (___)
                 "textTabs": [
                     # Bedrooms
@@ -533,14 +505,14 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
                     { "anchorString": "[_PrevLandlord_]", "anchorYOffset": "-2", "width": "150", "required": "false", "documentId": "1", "tabLabel": "PrevLandlord" },
                     { "anchorString": "[_PrevRent_]", "anchorYOffset": "-2", "width": "80", "required": "false", "documentId": "1", "tabLabel": "PrevRent" },
                     { "anchorString": "[_LeaveReason_]", "anchorYOffset": "-2", "width": "200", "required": "false", "documentId": "1", "tabLabel": "LeaveReason" },
-                ] + dynamic_text_tabs,
+                ],
                 # Auto-place checkboxes for [ ]
                 "checkboxTabs": [
                     { "anchorString": "[_PetY_]", "anchorYOffset": "0", "documentId": "1", "tabLabel": "HasPets" },
                     { "anchorString": "[_PetN_]", "anchorYOffset": "0", "documentId": "1", "tabLabel": "NoPets" },
                     # Generic fallback just in case
                     { "anchorString": "[ ]", "anchorYOffset": "0", "documentId": "1", "tabLabel": "GenericCheckbox" }
-                ] + dynamic_checkbox_tabs
+                ]
             }
         }
 
@@ -559,16 +531,10 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
                     "anchorUnits": "pixels",
                     "documentId": "1"
                 }],
-                "dateSignedTabs": [{
-                    "anchorString": "Date:",
-                    "anchorYOffset": "-5",
-                    "anchorXOffset": "50",
-                    "anchorUnits": "pixels",
-                    "documentId": "1"
-                }]
+                # Date tab removed as per request (pre-filled)
             }
         }
-
+        
         # RAW REQUEST ATTEMPT TO BYPASS SDK ISSUES
         import json as json_lib
         

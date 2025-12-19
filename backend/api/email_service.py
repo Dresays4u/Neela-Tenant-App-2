@@ -1317,22 +1317,22 @@ def _send_landlord_lease_ready_to_sign(legal_document_id: int):
     Hello {landlord_name},
 
     The tenant has completed their signature for the lease agreement.
-
-    Tenant: {legal_doc.tenant.name}
-    Property Unit: {legal_doc.tenant.property_unit}
-
+        
+        Tenant: {legal_doc.tenant.name}
+        Property Unit: {legal_doc.tenant.property_unit}
+        
     Please sign the lease in DocuSign (check your DocuSign inbox for the signing email).
-
+        
     Thanks,
     Neela Property Management Team
-    """
-
+        """
+        
     send_email_with_logging(
-        subject=subject,
-        message=message,
+    subject=subject,
+    message=message,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[landlord_email],
-        email_type=f"landlord signing notification (document {legal_doc.id})"
+    recipient_list=[landlord_email],
+    email_type=f"landlord signing notification (document {legal_doc.id})"
     )
 
 
@@ -1344,7 +1344,7 @@ def send_landlord_lease_ready_to_sign(legal_document_id: int):
     email_backend = getattr(settings, 'EMAIL_BACKEND', 'unknown')
     logger.info(
         f"Celery task executing: send_landlord_lease_ready_to_sign for document {legal_document_id}, using email backend: {email_backend}"
-    )
+        )
     _send_landlord_lease_ready_to_sign(legal_document_id)
 
 

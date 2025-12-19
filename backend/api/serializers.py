@@ -173,10 +173,6 @@ class LegalDocumentSerializer(serializers.ModelSerializer):
         fields = '__all__'
     
     def get_pdf_url(self, obj):
-        """
-        Return a backend-proxied PDF URL.
-        Cloudinary CDN URLs can return 401/404 depending on account access control; proxying avoids that.
-        """
         request = self.context.get('request')
         if not request:
             return None

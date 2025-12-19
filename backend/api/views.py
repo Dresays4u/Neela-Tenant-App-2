@@ -175,10 +175,7 @@ class TenantViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='me', url_name='me')
     def me(self, request):
-        """
-        Get the current authenticated user's tenant data.
-        GET /api/tenants/me/
-        """
+        
         user = request.user
         try:
             tenant = Tenant.objects.filter(email=user.email).first()
@@ -541,10 +538,10 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                     candidate_public_ids.append(f"{clean_path}.pdf")
 
                             candidate_types = ["upload", "authenticated", "private"]
-
+                            
                             pdf_content = None
                             chosen_url = None
-
+                            
                             for t in candidate_types:
                                 if pdf_content:
                                     break
@@ -573,7 +570,7 @@ class LegalDocumentViewSet(viewsets.ModelViewSet):
                                             break
                                     except Exception as e:
                                         logger.warning(f"Error generating raw signed URL for type={t}, pid={pid}: {e}")
-
+                                    
                                     # 3) Try Cloudinary Admin signed download URL (most reliable for server-side)
                                     try:
                                         if hasattr(cloudinary.utils, "private_download_url"):
