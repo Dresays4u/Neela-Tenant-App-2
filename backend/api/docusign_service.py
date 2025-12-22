@@ -463,56 +463,102 @@ def create_envelope(legal_document_id: int, tenant_email: str, tenant_name: str,
                 # Date tab removed as per request (pre-filled)
                 # Auto-place text fields for missing info (___)
                 "textTabs": [
-                    # Bedrooms
-                    { "anchorString": "[_Beds_]", "anchorYOffset": "-2", "width": "40", "required": "false", "documentId": "1", "tabLabel": "Bedrooms" },
-                    # Bathrooms
-                    { "anchorString": "[_Baths_]", "anchorYOffset": "-2", "width": "40", "required": "false", "documentId": "1", "tabLabel": "Bathrooms" },
-                    # DOB
-                    { "anchorString": "[_DOB_]", "anchorYOffset": "-2", "width": "80", "required": "false", "documentId": "1", "tabLabel": "DOB" },
-                    # Driver License
-                    { "anchorString": "[_DL_]", "anchorYOffset": "-2", "width": "100", "required": "false", "documentId": "1", "tabLabel": "DriverLicense" },
-                    # DL State
-                    { "anchorString": "[_DLState_]", "anchorYOffset": "-2", "width": "40", "required": "false", "documentId": "1", "tabLabel": "DLState" },
-                    # SSN
-                    { "anchorString": "[_SSN_]", "anchorYOffset": "-2", "width": "100", "required": "false", "documentId": "1", "tabLabel": "SSN" },
-                    # Marital Status
-                    { "anchorString": "[_Marital_]", "anchorYOffset": "-2", "width": "80", "required": "false", "documentId": "1", "tabLabel": "MaritalStatus" },
-                    # Citizenship
-                    { "anchorString": "[_Citizen_]", "anchorYOffset": "-2", "width": "80", "required": "false", "documentId": "1", "tabLabel": "Citizenship" },
-                    # Height
-                    { "anchorString": "[_Height_]", "anchorYOffset": "-2", "width": "60", "required": "false", "documentId": "1", "tabLabel": "Height" },
-                    # Weight
-                    { "anchorString": "[_Weight_]", "anchorYOffset": "-2", "width": "60", "required": "false", "documentId": "1", "tabLabel": "Weight" },
-                    # Hair
-                    { "anchorString": "[_Hair_]", "anchorYOffset": "-2", "width": "60", "required": "false", "documentId": "1", "tabLabel": "HairColor" },
-                    # Eye
-                    { "anchorString": "[_Eye_]", "anchorYOffset": "-2", "width": "60", "required": "false", "documentId": "1", "tabLabel": "EyeColor" },
-                    # Emergency Contact
-                    { "anchorString": "[_EmergName_]", "anchorYOffset": "-2", "width": "150", "required": "false", "documentId": "1", "tabLabel": "EmergName" },
-                    { "anchorString": "[_EmergPhone_]", "anchorYOffset": "-2", "width": "100", "required": "false", "documentId": "1", "tabLabel": "EmergPhone" },
-                    { "anchorString": "[_EmergAddr_]", "anchorYOffset": "-2", "width": "200", "required": "false", "documentId": "1", "tabLabel": "EmergAddr" },
-                    { "anchorString": "[_EmergEmail_]", "anchorYOffset": "-2", "width": "150", "required": "false", "documentId": "1", "tabLabel": "EmergEmail" },
-                    # Employment
-                    { "anchorString": "[_SupName_]", "anchorYOffset": "-2", "width": "150", "required": "false", "documentId": "1", "tabLabel": "SupName" },
-                    { "anchorString": "[_SupPhone_]", "anchorYOffset": "-2", "width": "100", "required": "false", "documentId": "1", "tabLabel": "SupPhone" },
-                    { "anchorString": "[_EmpStart_]", "anchorYOffset": "-2", "width": "80", "required": "false", "documentId": "1", "tabLabel": "EmpStart" },
-                    { "anchorString": "[_EmpDur_]", "anchorYOffset": "-2", "width": "60", "required": "false", "documentId": "1", "tabLabel": "EmpDur" },
-                    { "anchorString": "[_Employer_]", "anchorYOffset": "-2", "width": "150", "required": "false", "documentId": "1", "tabLabel": "Employer" },
-                    { "anchorString": "[_JobTitle_]", "anchorYOffset": "-2", "width": "100", "required": "false", "documentId": "1", "tabLabel": "JobTitle" },
-                    { "anchorString": "[_Income_]", "anchorYOffset": "-2", "width": "80", "required": "false", "documentId": "1", "tabLabel": "Income" },
-                    # Previous Rental
-                    { "anchorString": "[_PrevAddr_]", "anchorYOffset": "-2", "width": "200", "required": "false", "documentId": "1", "tabLabel": "PrevAddr" },
-                    { "anchorString": "[_PrevLandlord_]", "anchorYOffset": "-2", "width": "150", "required": "false", "documentId": "1", "tabLabel": "PrevLandlord" },
-                    { "anchorString": "[_PrevRent_]", "anchorYOffset": "-2", "width": "80", "required": "false", "documentId": "1", "tabLabel": "PrevRent" },
-                    { "anchorString": "[_LeaveReason_]", "anchorYOffset": "-2", "width": "200", "required": "false", "documentId": "1", "tabLabel": "LeaveReason" },
+                    # Previous Landlord Phone (using anchor "Phone: Day:")
+                    {
+                        "anchorString": "Phone: Day:",
+                        "anchorYOffset": "-1",
+                        "anchorXOffset": "50",
+                        "width": "80",
+                        "required": "false",
+                        "documentId": "1",
+                        "tabLabel": "PrevLandlordPhoneDay",
+                        "font": "arial",
+                        "fontSize": "size9"
+                    },
+                    {
+                        "anchorString": "Phone: Day:",
+                        "anchorYOffset": "-1",
+                        "anchorXOffset": "145", # Nt offset
+                        "width": "60",
+                        "required": "false",
+                        "documentId": "1",
+                        "tabLabel": "PrevLandlordPhoneNt",
+                        "font": "arial",
+                        "fontSize": "size9"
+                    },
+                    {
+                        "anchorString": "Phone: Day:",
+                        "anchorYOffset": "-1",
+                        "anchorXOffset": "225", # Mb offset
+                        "width": "60",
+                        "required": "false",
+                        "documentId": "1",
+                        "tabLabel": "PrevLandlordPhoneMb",
+                        "font": "arial",
+                        "fontSize": "size9"
+                    },
+                    {
+                        "anchorString": "Phone: Day:",
+                        "anchorYOffset": "-1",
+                        "anchorXOffset": "310", # Fax offset
+                        "width": "60",
+                        "required": "false",
+                        "documentId": "1",
+                        "tabLabel": "PrevLandlordFax",
+                        "font": "arial",
+                        "fontSize": "size9"
+                    },
+                    # Previous Landlord Email
+                    {
+                        "anchorString": "Email:",
+                        "anchorYOffset": "-1",
+                        "anchorXOffset": "30",
+                        "width": "200",
+                        "required": "false",
+                        "documentId": "1",
+                        "tabLabel": "PrevLandlordEmail",
+                        "font": "arial",
+                        "fontSize": "size9"
+                    },
+                    # Date Moved In
+                    {
+                        "anchorString": "Date Moved-In:",
+                        "anchorYOffset": "-1",
+                        "anchorXOffset": "65",
+                        "width": "80",
+                        "required": "false",
+                        "documentId": "1",
+                        "tabLabel": "PrevMoveInDate",
+                        "font": "arial",
+                        "fontSize": "size9"
+                    },
+                    # Move Out Date
+                    {
+                        "anchorString": "Move-Out Date:",
+                        "anchorYOffset": "-1",
+                        "anchorXOffset": "65",
+                        "width": "80",
+                        "required": "false",
+                        "documentId": "1",
+                        "tabLabel": "PrevMoveOutDate",
+                        "font": "arial",
+                        "fontSize": "size9"
+                    },
+                    # Rent
+                    {
+                        "anchorString": "Rent $:",
+                        "anchorYOffset": "-1",
+                        "anchorXOffset": "35",
+                        "width": "60",
+                        "required": "false",
+                        "documentId": "1",
+                        "tabLabel": "PrevRent",
+                        "font": "arial",
+                        "fontSize": "size9"
+                    }
                 ],
                 # Auto-place checkboxes for [ ]
-                "checkboxTabs": [
-                    { "anchorString": "[_PetY_]", "anchorYOffset": "0", "documentId": "1", "tabLabel": "HasPets" },
-                    { "anchorString": "[_PetN_]", "anchorYOffset": "0", "documentId": "1", "tabLabel": "NoPets" },
-                    # Generic fallback just in case
-                    { "anchorString": "[ ]", "anchorYOffset": "0", "documentId": "1", "tabLabel": "GenericCheckbox" }
-                ]
+                "checkboxTabs": []
             }
         }
 

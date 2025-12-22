@@ -141,8 +141,12 @@ def fill_lease_template(template_content: str, tenant: Tenant) -> str:
         # Rental History
         '{{previous_address}}': application_data.get('previousAddress') or '[_PrevAddr_]',
         '{{previous_landlord}}': application_data.get('previousLandlordInfo') or '[_PrevLandlord_]',
+        '{{previous_landlord_phone}}': application_data.get('previousLandlordPhone') or '[_PrevLandlordPhone_]',
+        '{{previous_landlord_email}}': application_data.get('previousLandlordEmail') or '[_PrevLandlordEmail_]',
         '{{previous_rent}}': application_data.get('previousRent') or '[_PrevRent_]',
         '{{reason_for_leaving}}': application_data.get('reasonForLeaving') or '[_LeaveReason_]',
+        '{{move_in_date_prev}}': application_data.get('prevMoveInDate') or '[_PrevMoveIn_]',
+        '{{move_out_date_prev}}': application_data.get('prevMoveOutDate') or '[_PrevMoveOut_]',
         
         # Standard Placeholders (if not mapped above)
         '{{bedrooms}}': bedrooms_val,

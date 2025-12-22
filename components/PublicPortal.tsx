@@ -1985,9 +1985,9 @@ ${payment.reference ? `Reference: ${payment.reference}` : ''}
                     
                     <div className="flex flex-wrap gap-4">
                        {/* Status check button - commented out for presentation */}
-                       {/* <button onClick={() => setView('check_status')} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-lg shadow-emerald-200 transition-colors flex items-center gap-2">
+                       <button onClick={() => setView('check_status')} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-lg shadow-emerald-200 transition-colors flex items-center gap-2">
                           <Clock className="w-5 h-5" /> Check Application Status
-                       </button> */}
+                       </button>
                        <button onClick={() => setLoginType('tenant')} className="px-6 py-3 bg-white text-indigo-900 font-bold rounded-lg hover:bg-indigo-50 transition-colors">
                          Resident Login
                        </button>
