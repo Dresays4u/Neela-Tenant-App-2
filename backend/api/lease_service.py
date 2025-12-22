@@ -270,11 +270,11 @@ If Tenant fails to pay rent or breaches any term of this Lease, Landlord may ter
 8. SIGNATURES
 By signing below, both parties agree to the terms of this Lease.
 
-Landlord's Signature: _________________________  Date: _________________________
+Landlord's Signature: _________________________  Date: {{current_date}}
 {{landlord_name}}
 
 
-Tenant's Signature: _________________________  Date: _________________________
+Tenant's Signature: _________________________  Date: {{current_date}}
 {{tenant_name}}"""
 
 

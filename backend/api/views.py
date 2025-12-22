@@ -71,28 +71,33 @@ class TenantViewSet(viewsets.ModelViewSet):
         tenant = serializer.save()
         new_status = tenant.status
         
-        # If status changed from 'Applicant' to 'Approved', send acceptance email
-        if old_status == 'Applicant' and new_status == 'Approved':
-            # Send notification to Admin about the approval
-            try:
-                task = send_application_approval_notification_to_admin.delay(tenant.id)
-                logger.info(f"Admin approval notification task submitted to Celery: {task.id}")
-            except Exception as e:
-                logger.warning(f"Celery connection failed for admin approval notification: {e}")
-                send_application_approval_notification_to_admin(tenant.id)
+        # If status changed from 'Applicant' to 'Approved', OR from 'Approved'/'Signed' to 'Active' (Move-In)
+        # Ensure user account exists and send setup email if they haven't set a password yet
+        if (old_status == 'Applicant' and new_status == 'Approved') or \
+           (old_status != 'Active' and new_status == 'Active'):
+            
+            # Send notification to Admin about the approval (only on first approval)
+            if new_status == 'Approved':
+                try:
+                    task = send_application_approval_notification_to_admin.delay(tenant.id)
+                    logger.info(f"Admin approval notification task submitted to Celery: {task.id}")
+                except Exception as e:
+                    logger.warning(f"Celery connection failed for admin approval notification: {e}")
+                    send_application_approval_notification_to_admin(tenant.id)
 
             # Create user account if it doesn't exist
             user, created = create_user_from_tenant(tenant)
             
-            # Auto-generate lease document
-            try:
-                # Check if lease already exists to prevent duplicates
-                if not LegalDocument.objects.filter(tenant=tenant, type='Lease Agreement').exists():
-                    pdf_buffer, filled_content = generate_lease_pdf(tenant)
-                    save_lease_document(tenant, pdf_buffer, filled_content)
-                    logger.info(f"Lease automatically generated for tenant {tenant.id}")
-            except Exception as e:
-                logger.error(f"Failed to auto-generate lease for tenant {tenant.id}: {e}")
+            # Auto-generate lease document (only on first approval)
+            if new_status == 'Approved':
+                try:
+                    # Check if lease already exists to prevent duplicates
+                    if not LegalDocument.objects.filter(tenant=tenant, type='Lease Agreement').exists():
+                        pdf_buffer, filled_content = generate_lease_pdf(tenant)
+                        save_lease_document(tenant, pdf_buffer, filled_content)
+                        logger.info(f"Lease automatically generated for tenant {tenant.id}")
+                except Exception as e:
+                    logger.error(f"Failed to auto-generate lease for tenant {tenant.id}: {e}")
 
             # Generate password reset token if the user was just created or has no password
             if created or not user.has_usable_password():

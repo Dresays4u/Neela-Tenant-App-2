@@ -159,7 +159,7 @@ Acknowledgement & Representation:
 (3) Applicant represents that the statements in this application are true and complete.
 
 Applicant's Signature: ___________________________________
-Date: __________________
+Date: {{current_date}}
 
 For Landlord's Use:
 On __________________ (name/initials) notified Applicant by [ ] phone [ ] mail [ ] e-mail [ ] fax [ ] in person that Applicant was [ ] approved [ ] not approved. Reason for disapproval: ___________________________________
@@ -186,7 +186,7 @@ I give my permission:
 (5) to the above-named person to obtain a copy of my consumer report (credit report) from any consumer reporting agency and to obtain background information about me.
 
 Applicant's Signature: ___________________________________
-Date: __________________
+Date: {{current_date}}
 """
         template, created = LeaseTemplate.objects.get_or_create(
             name='Wills Lease Packet',
