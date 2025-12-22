@@ -648,7 +648,14 @@ Landlord                            Tenant
                             </>
                           )}
                         </button>
-                        <button className="w-full py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50">
+                        <button 
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to decline this application?')) {
+                              handleStatusChange(selectedApplicant.id, 'Declined' as TenantStatus);
+                            }
+                          }}
+                          className="w-full py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+                        >
                            Decline
                         </button>
                       </>
